@@ -3,24 +3,22 @@ from __future__ import annotations
 import re
 from typing import Sequence
 
+from ai.ingestion.kb_b_catalog import source_label_for_document
 from ai.ingestion.vector_store import RetrievedChunk
 from models.ai_types import Citation
-
-SOURCE_LABELS = {
-    "policy_pdf": "Your Policy",
-    "ca_fair_claims": "California Fair Claims Regulations",
-    "iso_pp_0001": "ISO Personal Auto Policy",
-    "naic_model_900": "NAIC Model 900",
-    "naic_model_902": "NAIC Model 902",
-    "iii_nofault": "Insurance Information Institute",
-    "naic_complaints": "NAIC Complaint Data",
-}
 
 SOURCE_REF_RE = re.compile(r"\[S(\d+)\]")
 
 
 def source_label_for_chunk(chunk: RetrievedChunk) -> str:
-    return SOURCE_LABELS.get(chunk.document_id or "", "Your Policy" if chunk.source_type == "kb_a" else "Regulatory Source")
+    metadata_label = chunk.metadata.get("source_label") or chunk.metadata.get("title")
+    if isinstance(metadata_label, str) and metadata_label.strip():
+        return metadata_label.strip()
+
+    if label := source_label_for_document(chunk.document_id):
+        return label
+
+    return "Your Policy" if chunk.source_type == "kb_a" else "Regulatory Source"
 
 
 def build_context_sections(
@@ -99,4 +97,3 @@ def fallback_citations(chunks: Sequence[RetrievedChunk], limit: int = 4) -> list
         if len(citations) >= limit:
             break
     return citations
-

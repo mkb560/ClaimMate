@@ -45,7 +45,7 @@ async def classify_dispute(
             },
             {"role": "user", "content": message_text},
         ],
-        max_tokens=150,
+        max_completion_tokens=150,
     )
     payload = json.loads(response.choices[0].message.content or "{}")
     dispute_type = str(payload.get("dispute_type", "NOT_DISPUTE")).upper()
@@ -58,4 +58,3 @@ async def classify_dispute(
         recommended_statute=STATUTE_BY_DISPUTE_TYPE[dispute_type],
         rationale=str(payload.get("rationale", "")),
     )
-

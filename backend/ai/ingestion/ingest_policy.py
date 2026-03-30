@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import boto3
 
@@ -28,11 +29,23 @@ def _fetch_policy_bytes(s3_key: str) -> bytes:
     return response["Body"].read()
 
 
-async def ingest_policy(s3_key: str, case_id: str) -> None:
-    policy_bytes = await asyncio.to_thread(_fetch_policy_bytes, s3_key)
+def _read_policy_file(pdf_path: str | Path) -> bytes:
+    return Path(pdf_path).expanduser().resolve().read_bytes()
+
+
+def _policy_source_label(pdf_path: str | Path | None) -> str:
+    if pdf_path is None:
+        return "Your Policy"
+    path = Path(pdf_path)
+    return f"Your Policy ({path.name})"
+
+
+async def _index_policy_bytes(policy_bytes: bytes, case_id: str, *, pdf_path: str | Path | None = None) -> int:
     pages = await asyncio.to_thread(parse_pdf_bytes, policy_bytes)
     chunks = chunk_policy_pages(pages, case_id=case_id)
     embeddings = await embed_texts([chunk.chunk_text for chunk in chunks])
+    source_label = _policy_source_label(pdf_path)
+    resolved_path = str(Path(pdf_path).expanduser().resolve()) if pdf_path is not None else None
 
     embedded_chunks: list[EmbeddedChunk] = []
     for chunk, embedding in zip(chunks, embeddings, strict=True):
@@ -45,8 +58,23 @@ async def ingest_policy(s3_key: str, case_id: str) -> None:
                 embedding=embedding,
                 page_num=chunk.page_num,
                 section=chunk.section,
-                metadata=chunk.metadata,
+                metadata={
+                    **chunk.metadata,
+                    "source_label": source_label,
+                    "policy_path": resolved_path,
+                },
             )
         )
 
     await replace_case_chunks(case_id, embedded_chunks)
+    return len(embedded_chunks)
+
+
+async def ingest_policy(s3_key: str, case_id: str) -> int:
+    policy_bytes = await asyncio.to_thread(_fetch_policy_bytes, s3_key)
+    return await _index_policy_bytes(policy_bytes, case_id)
+
+
+async def ingest_local_policy_file(pdf_path: str | Path, case_id: str) -> int:
+    policy_bytes = await asyncio.to_thread(_read_policy_file, pdf_path)
+    return await _index_policy_bytes(policy_bytes, case_id, pdf_path=pdf_path)

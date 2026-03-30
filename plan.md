@@ -26,8 +26,8 @@ This version replaces the older Qwen/DashScope plan. The backend AI scaffold is 
 
 | Component | Final Choice | Why |
 |---|---|---|
-| Primary LLM | `gpt-5-mini` | One provider for MVP, good quality/cost tradeoff for grounded QA |
-| Classification LLM | `gpt-5-nano` | Cheap semantic classification for dispute routing |
+| Primary LLM | `gpt-5.4-mini` | Strong mini model for grounded QA, coding, and lower-latency production use |
+| Classification LLM | `gpt-5.4-nano` | Cheapest GPT-5.4-class option for lightweight dispute routing |
 | Embeddings | `text-embedding-3-small` | Very low cost and sufficient for policy/regulatory retrieval |
 | Vector store | PostgreSQL + `pgvector` | Clean relational integration and case-level isolation |
 | DB access | shared `SQLAlchemy AsyncEngine` | One pool, one driver, easier handoff with Ke Wu's FastAPI app |
@@ -115,7 +115,7 @@ Policy PDF / Regulatory HTML or PDF
         │
    query_engine.py
         │
-   gpt-5-mini
+   gpt-5.4-mini
         │
    AnswerResponse with citations + disclaimer
 ```
@@ -245,7 +245,7 @@ User question
              │
       build <policy_context> + <regulatory_context>
              │
-          gpt-5-mini
+          gpt-5.4-mini
              │
     parse [S1], [S2] inline citations
              │
@@ -332,7 +332,7 @@ Soft triggers require at least 2 matches before escalating.
 
 Implemented in `semantic_detector.py`.
 
-- Model: `gpt-5-nano`
+- Model: `gpt-5.4-nano`
 - Output format: JSON
 - Labels: `DENIAL | DELAY | AMOUNT | OTHER | NOT_DISPUTE`
 
@@ -464,8 +464,8 @@ Current `AIConfig` shape:
 ```python
 openai_api_key: str = ""
 openai_base_url: str = "https://api.openai.com/v1"
-rag_model: str = "gpt-5-mini"
-classification_model: str = "gpt-5-nano"
+rag_model: str = "gpt-5.4-mini"
+classification_model: str = "gpt-5.4-nano"
 embedding_model: str = "text-embedding-3-small"
 database_url: str = ""
 

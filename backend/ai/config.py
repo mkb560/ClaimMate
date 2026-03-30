@@ -15,8 +15,8 @@ class AIConfig(BaseSettings):
 
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
-    rag_model: str = "gpt-5-mini"
-    classification_model: str = "gpt-5-nano"
+    rag_model: str = "gpt-5.4-mini"
+    classification_model: str = "gpt-5.4-nano"
     embedding_model: str = "text-embedding-3-small"
     database_url: str = ""
 
@@ -56,4 +56,3 @@ def get_ai_config() -> AIConfig:
 
 
 ai_config = get_ai_config()
-

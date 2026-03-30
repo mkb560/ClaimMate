@@ -4,9 +4,10 @@ This file gives coding agents the current source of truth for this repository.
 
 ## Repository Status
 
-- As of 2026-03-28, this directory is **not initialized as a Git repository yet**.
+- As of 2026-03-29, this directory is an active Git repository cloned from GitHub.
 - The actual codebase in this repo is currently the **AI/backend scaffold** under `backend/`.
-- The root folder also contains planning and proposal documents (`plan.md`, PDFs, DOCX files), but those are not application runtime code.
+- The repository root also contains the curated `claimmate_rag_docs/` directory for local KB-B indexing.
+- The root folder may also contain planning documents such as `plan.md`, but those are not application runtime code.
 - The FastAPI app currently exposes only a minimal `/health` route in `backend/main.py`.
 - Most product behavior currently exists as reusable AI modules plus tests, not as fully wired API endpoints.
 
@@ -36,6 +37,7 @@ backend/
 │   ├── deadline/
 │   ├── dispute/
 │   ├── ingestion/
+│   ├── policy/
 │   └── rag/
 ├── models/
 │   └── ai_types.py
@@ -61,13 +63,22 @@ backend/
   - `chunker.py`: token-aware chunking with different KB-A / KB-B settings
   - `embedder.py`: OpenAI embeddings wrapper
   - `vector_store.py`: `pgvector` + SQLAlchemy model and retrieval helpers
-  - `ingest_policy.py`: pulls a policy PDF from S3, chunks it, embeds it, and stores case chunks
-  - `kb_b_loader.py`: downloads and indexes external regulatory/reference sources
+  - `ingest_policy.py`: ingests a policy PDF from S3 or a local file, chunks it, embeds it, and stores case chunks
+  - `kb_b_loader.py`: indexes KB-B sources from remote URLs or a local docs directory
+  - `kb_b_catalog.py`: shared labels and dispute-relevant KB-B document IDs
+
+- `backend/ai/runtime.py`
+  - Creates the shared async SQLAlchemy engine from `DATABASE_URL`
+  - Bootstraps the `pgvector` schema and sessionmaker for local scripts or FastAPI startup
 
 - `backend/ai/rag/`
   - `query_engine.py`: dual-source retrieval over policy chunks and regulatory chunks
   - `citation_formatter.py`: context packing and citation extraction/fallbacks
   - `prompt_templates.py`: system prompts, disclaimer, and fallback text
+
+- `backend/ai/policy/`
+  - `fact_extractor.py`: deterministic extraction for common policy facts such as policyholders, policy number, policy period, insurer, policy change, discount totals, optional coverage, and verification-of-insurance detection
+  - Structured policy answers are attempted before general LLM generation for supported question types
 
 - `backend/ai/dispute/`
   - `keyword_filter.py`: fast keyword-based dispute detection
@@ -87,7 +98,13 @@ backend/
   - Shared dataclasses and enums for chat stages, triggers, citations, events, and response payloads
 
 - `backend/tests/`
-  - Deterministic tests for mention parsing, stage routing, deadline math, dispute keyword logic, citations, and chat orchestration
+  - Deterministic tests for mention parsing, stage routing, deadline math, dispute keyword logic, citations, local KB-B source discovery, and chat orchestration
+
+- `backend/scripts/`
+  - `index_local_kb_b.py`: indexes local files from `claimmate_rag_docs/` into PostgreSQL + `pgvector`
+  - `ingest_local_policy.py`: ingests a local policy PDF into KB-A for a case
+  - `query_local_rag.py`: runs a local RAG question against the vector store
+  - `run_demo_eval.py`: runs the fixed local demo/eval suite against known policy PDFs and mixed KB-A + KB-B questions
 
 ## Current Runtime Behavior
 
@@ -95,8 +112,11 @@ backend/
 
 - User policy documents are treated as **KB-A**
 - Regulatory/reference materials are treated as **KB-B**
+- Local curated PDFs under `claimmate_rag_docs/` can be indexed as KB-B without downloading remote sources
+- Supported policy-fact questions are answered first through deterministic extraction before falling back to general RAG generation
 - `answer_policy_question(case_id, question)` retrieves from both sources and answers with inline `[S#]` citations
 - `answer_dispute_question(...)` narrows regulatory retrieval to dispute-relevant documents and applies stage-specific instructions
+- If the first generation pass returns a grounded fallback response, the RAG layer performs a narrower rescue pass over top snippets before giving up
 - All final answers append a fixed disclaimer
 
 ### Chat AI
@@ -125,6 +145,7 @@ backend/
 
 - `backend/ai/ingestion/vector_store.py` requires `init_engine(engine)` to be called before any DB-backed vector or deadline operations
 - `ensure_vector_schema(engine)` should be run during bootstrap/migration setup
+- `backend/ai/runtime.py` now provides `create_ai_engine()` and `bootstrap_vector_store(engine)` for this setup
 
 ### Required `cases` fields
 
@@ -167,6 +188,8 @@ cd backend
 ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/uvicorn main:app --reload
 ./.venv/bin/pytest
+DATABASE_URL=postgresql+psycopg://... ./.venv/bin/python scripts/index_local_kb_b.py
+DATABASE_URL=postgresql+psycopg://... ./.venv/bin/python scripts/query_local_rag.py "What is the 15-day claim acknowledgment rule?"
 ```
 
 If `.venv` does not exist yet:
@@ -196,6 +219,8 @@ Use `backend/.env.example` as the template. Current variables:
 
 - Running `pytest` outside the project virtual environment may fail if required packages such as `pgvector` are not installed in the active interpreter
 - In this repo, `./.venv/bin/pytest` is the reliable command
+- Local KB-B indexing requires both a working `DATABASE_URL` and an `OPENAI_API_KEY` with available quota
+- The local demo/eval suite can be run with `DATABASE_URL=... OPENAI_API_KEY=... ./.venv/bin/python scripts/run_demo_eval.py`
 
 ## GitHub Collaboration Recommendations
 

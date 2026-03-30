@@ -7,9 +7,11 @@ from openai import AsyncOpenAI
 from ai.clients import get_openai_client
 from ai.config import ai_config
 from ai.ingestion.embedder import embed_texts
+from ai.ingestion.kb_b_catalog import DISPUTE_RELEVANT_DOCUMENT_IDS
 from ai.ingestion.vector_store import list_policy_chunks, search_case_chunks, search_kb_b_chunks
-from ai.rag.citation_formatter import build_context_sections, citations_from_answer, fallback_citations
-from ai.rag.prompt_templates import DISCLAIMER_FOOTER, NOT_ENOUGH_INFO_MESSAGE, SYSTEM_PROMPT_DISPUTE, SYSTEM_PROMPT_RAG, compose_system_prompt
+from ai.policy.fact_extractor import answer_structured_policy_question
+from ai.rag.citation_formatter import build_context_sections, citations_from_answer, fallback_citations, source_label_for_chunk
+from ai.rag.prompt_templates import DISCLAIMER_FOOTER, NOT_ENOUGH_INFO_MESSAGE, SYSTEM_PROMPT_DISPUTE, SYSTEM_PROMPT_RAG, SYSTEM_PROMPT_RESCUE, compose_system_prompt
 from models.ai_types import AnswerResponse, ChatStage
 
 
@@ -18,6 +20,48 @@ def _normalize_answer(answer: str) -> str:
     if DISCLAIMER_FOOTER in stripped:
         stripped = stripped.replace(DISCLAIMER_FOOTER, "").strip()
     return f"{stripped}\n\n{DISCLAIMER_FOOTER}"
+
+
+def _is_not_enough_info(answer: str) -> bool:
+    return NOT_ENOUGH_INFO_MESSAGE.lower() in answer.lower()
+
+
+def _build_rescue_context(source_index: dict[str, object], *, limit: int = 4) -> str:
+    lines: list[str] = []
+    for ref, chunk in list(source_index.items())[:limit]:
+        label = source_label_for_chunk(chunk)
+        location: list[str] = []
+        if chunk.page_num is not None:
+            location.append(f"Page {chunk.page_num}")
+        if chunk.section:
+            location.append(f"Section {chunk.section}")
+        location_text = " | ".join(location) if location else "No page metadata"
+        lines.append(f"[{ref}] {label} | {location_text}\n{chunk.chunk_text}")
+    return "<snippets>\n" + "\n\n".join(lines) + "\n</snippets>"
+
+
+async def _generate_rescue_answer(
+    *,
+    question: str,
+    source_index: dict[str, object],
+    client: AsyncOpenAI,
+) -> str:
+    response = await client.chat.completions.create(
+        model=ai_config.rag_model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT_RESCUE},
+            {
+                "role": "user",
+                "content": (
+                    f"{_build_rescue_context(source_index)}\n\n"
+                    f"Question: {question}\n\n"
+                    "Answer with inline citations after each factual sentence."
+                ),
+            },
+        ],
+        max_completion_tokens=700,
+    )
+    return response.choices[0].message.content or NOT_ENOUGH_INFO_MESSAGE
 
 
 async def _embed_query(question: str) -> list[float]:
@@ -54,9 +98,17 @@ async def _generate_answer(
                 ),
             },
         ],
-        max_tokens=700,
+        max_completion_tokens=1400,
     )
     raw_answer = response.choices[0].message.content or NOT_ENOUGH_INFO_MESSAGE
+    if _is_not_enough_info(raw_answer):
+        rescued_answer = await _generate_rescue_answer(
+            question=question,
+            source_index=source_index,
+            client=openai_client,
+        )
+        if not _is_not_enough_info(rescued_answer):
+            raw_answer = rescued_answer
     citations = citations_from_answer(raw_answer, source_index) or fallback_citations(all_chunks)
     return AnswerResponse(
         answer=_normalize_answer(raw_answer),
@@ -71,6 +123,12 @@ async def answer_policy_question(case_id: str, question: str, *, client: AsyncOp
         search_case_chunks(case_id, query_embedding, top_k=ai_config.rag_top_k_per_source),
         search_kb_b_chunks(query_embedding, top_k=ai_config.rag_top_k_per_source),
     )
+    if policy_chunks:
+        all_policy_chunks = await list_policy_chunks(case_id, limit=None)
+        if structured_answer := answer_structured_policy_question(question, all_policy_chunks):
+            structured_answer.answer = _normalize_answer(structured_answer.answer)
+            structured_answer.disclaimer = DISCLAIMER_FOOTER
+            return structured_answer
     return await _generate_answer(
         question=question,
         policy_chunks=policy_chunks,
@@ -93,7 +151,7 @@ async def answer_dispute_question(
         search_kb_b_chunks(
             query_embedding,
             top_k=ai_config.rag_top_k_per_source,
-            document_ids=["ca_fair_claims", "naic_model_900", "naic_model_902"],
+            document_ids=DISPUTE_RELEVANT_DOCUMENT_IDS,
         ),
     )
     return await _generate_answer(
