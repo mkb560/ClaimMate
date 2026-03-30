@@ -33,6 +33,7 @@ class Participant:
 
 @dataclass(slots=True)
 class Citation:
+    source_type: str
     source_label: str
     document_id: str
     page_num: int | None = None
@@ -65,4 +66,3 @@ class ChatEvent:
     trigger: ChatEventTrigger
     metadata: dict[str, Any] = field(default_factory=dict)
     occurred_at: datetime | None = None
-

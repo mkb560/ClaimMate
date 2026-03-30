@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from ai.ingestion.vector_store import RetrievedChunk
-from ai.rag.citation_formatter import source_label_for_chunk
+from ai.rag.citation_formatter import normalize_citation_section, source_label_for_chunk
 from models.ai_types import AnswerResponse, Citation
 
 POLICY_NUMBER_RE = re.compile(r"\b\d{3}\s\d{3}\s\d{3}\b|\b\d{9}\b")
@@ -218,10 +218,11 @@ def _detect_requested_keys(question: str) -> set[str]:
 
 def _fact_to_citation(fact: PolicyFact) -> Citation:
     return Citation(
+        source_type="kb_a",
         source_label=fact.source_label,
         document_id="policy_pdf",
         page_num=fact.page_num,
-        section=fact.section,
+        section=normalize_citation_section(fact.section),
         excerpt=fact.excerpt,
     )
 

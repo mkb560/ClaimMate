@@ -1,5 +1,5 @@
 from ai.ingestion.vector_store import RetrievedChunk
-from ai.rag.citation_formatter import build_context_sections, citations_from_answer, fallback_citations, source_label_for_chunk
+from ai.rag.citation_formatter import build_context_sections, citations_from_answer, fallback_citations, normalize_citation_section, source_label_for_chunk
 
 
 def test_citations_from_answer_reads_source_refs() -> None:
@@ -22,6 +22,7 @@ def test_citations_from_answer_reads_source_refs() -> None:
     citations = citations_from_answer("Your deductible is $500. [S1] The regulation says 15 days. [S2]", source_index)
 
     assert [citation.document_id for citation in citations] == ["policy_pdf", "ca_fair_claims"]
+    assert [citation.source_type for citation in citations] == ["kb_a", "kb_b"]
 
 
 def test_fallback_citations_deduplicate_by_location() -> None:
@@ -69,3 +70,9 @@ def test_source_label_uses_policy_file_name_from_metadata() -> None:
     )
 
     assert source_label_for_chunk(chunk) == "Your Policy (sample-policy.pdf)"
+
+
+def test_normalize_citation_section_hides_noisy_ocr_like_tokens() -> None:
+    assert normalize_citation_section("TFADFFFTTTAFDTFTADATDDTAFFFTTAFDTAFDFFTAFDATTDATTDDFFAFTDFDFFDDAA") is None
+    assert normalize_citation_section("DECLARATIONS") == "DECLARATIONS"
+    assert normalize_citation_section("§2695.5") == "§2695.5"

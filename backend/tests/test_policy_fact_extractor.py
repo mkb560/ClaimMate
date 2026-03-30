@@ -41,3 +41,4 @@ def test_answer_structured_policy_question_prefers_deterministic_fact_answer() -
     assert "Mingtao Ding" in answer.answer
     assert "871890019" in answer.answer
     assert len(answer.citations) >= 1
+    assert answer.citations[0].source_type == "kb_a"

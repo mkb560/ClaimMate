@@ -10,6 +10,28 @@ from models.ai_types import Citation
 SOURCE_REF_RE = re.compile(r"\[S(\d+)\]")
 
 
+def normalize_citation_section(section: str | None) -> str | None:
+    if section is None:
+        return None
+
+    cleaned = section.strip()
+    if not cleaned:
+        return None
+
+    letters_only = re.sub(r"[^A-Za-z]", "", cleaned)
+    unique_letters = set(letters_only.upper())
+    if (
+        len(cleaned) >= 24
+        and " " not in cleaned
+        and not cleaned.startswith("§")
+        and letters_only
+        and len(unique_letters) <= 6
+    ):
+        return None
+
+    return cleaned
+
+
 def source_label_for_chunk(chunk: RetrievedChunk) -> str:
     metadata_label = chunk.metadata.get("source_label") or chunk.metadata.get("title")
     if isinstance(metadata_label, str) and metadata_label.strip():
@@ -41,8 +63,8 @@ def build_context_sections(
             location: list[str] = []
             if chunk.page_num is not None:
                 location.append(f"Page {chunk.page_num}")
-            if chunk.section:
-                location.append(f"Section {chunk.section}")
+            if display_section := normalize_citation_section(chunk.section):
+                location.append(f"Section {display_section}")
             location_text = " | ".join(location) if location else "No page metadata"
             lines.append(f"[{ref}] {label} | {location_text}\n{chunk.chunk_text}")
             counter += 1
@@ -66,10 +88,11 @@ def citations_from_answer(answer: str, source_index: dict[str, RetrievedChunk]) 
         chunk = source_index[ref]
         citations.append(
             Citation(
+                source_type=chunk.source_type,
                 source_label=source_label_for_chunk(chunk),
                 document_id=chunk.document_id or ("policy_pdf" if chunk.source_type == "kb_a" else "unknown"),
                 page_num=chunk.page_num,
-                section=chunk.section,
+                section=normalize_citation_section(chunk.section),
                 excerpt=chunk.chunk_text[:100].strip(),
             )
         )
@@ -87,10 +110,11 @@ def fallback_citations(chunks: Sequence[RetrievedChunk], limit: int = 4) -> list
         seen.add(key)
         citations.append(
             Citation(
+                source_type=chunk.source_type,
                 source_label=source_label_for_chunk(chunk),
                 document_id=chunk.document_id or ("policy_pdf" if chunk.source_type == "kb_a" else "unknown"),
                 page_num=chunk.page_num,
-                section=chunk.section,
+                section=normalize_citation_section(chunk.section),
                 excerpt=chunk.chunk_text[:100].strip(),
             )
         )
