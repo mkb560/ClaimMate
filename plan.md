@@ -28,7 +28,7 @@ This version replaces the older Qwen/DashScope plan. The backend AI scaffold is 
 |---|---|---|
 | Primary LLM | `gpt-5.4-mini` | Strong mini model for grounded QA, coding, and lower-latency production use |
 | Classification LLM | `gpt-5.4-nano` | Cheapest GPT-5.4-class option for lightweight dispute routing |
-| Embeddings | `text-embedding-3-small` | Very low cost and sufficient for policy/regulatory retrieval |
+| Embeddings | `text-embedding-3-large` at 1536 dimensions | Better retrieval quality while staying compatible with the current `pgvector(1536)` schema |
 | Vector store | PostgreSQL + `pgvector` | Clean relational integration and case-level isolation |
 | DB access | shared `SQLAlchemy AsyncEngine` | One pool, one driver, easier handoff with Ke Wu's FastAPI app |
 | Chunking | `tiktoken` | Simple token-aware chunking without extra framework overhead |
@@ -239,7 +239,7 @@ Implementation notes:
 ```text
 User question
     │
-    ├── embed question with text-embedding-3-small
+    ├── embed question with text-embedding-3-large (1536 dimensions)
     ├── search KB-A by case_id
     └── search KB-B across shared regulatory corpus
              │
@@ -466,7 +466,7 @@ openai_api_key: str = ""
 openai_base_url: str = "https://api.openai.com/v1"
 rag_model: str = "gpt-5.4-mini"
 classification_model: str = "gpt-5.4-nano"
-embedding_model: str = "text-embedding-3-small"
+embedding_model: str = "text-embedding-3-large"
 database_url: str = ""
 
 aws_access_key_id: str = ""
@@ -577,7 +577,7 @@ Expected result in the current scaffold:
 ## References
 
 - [OpenAI API Pricing](https://openai.com/api/pricing)
-- [OpenAI `text-embedding-3-small`](https://developers.openai.com/api/docs/models/text-embedding-3-small)
+- [OpenAI Embeddings Guide](https://platform.openai.com/docs/guides/embeddings)
 - [pgvector Python SQLAlchemy support](https://github.com/pgvector/pgvector-python)
 - [California Fair Claims Regulations](https://www.insurance.ca.gov/01-consumers/130-laws-regs-hearings/05-CCR/fair-claims-regs.cfm)
 - [California DOI claim timing guide](https://www.insurance.ca.gov/0200-industry/0050-renew-license/0200-requirements/upload/Guide-for-Adjusting-Property-Claims-in-California-After-a-Major-Disaster.pdf)

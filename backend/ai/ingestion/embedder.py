@@ -22,10 +22,13 @@ async def embed_texts(
 
     for start in range(0, len(texts), batch_size):
         batch = list(texts[start : start + batch_size])
-        response = await openai_client.embeddings.create(
-            model=ai_config.embedding_model,
-            input=batch,
-        )
+        request_kwargs = {
+            "model": ai_config.embedding_model,
+            "input": batch,
+        }
+        if ai_config.embedding_model.startswith("text-embedding-3"):
+            request_kwargs["dimensions"] = ai_config.vector_dimensions
+        response = await openai_client.embeddings.create(**request_kwargs)
         embeddings.extend([list(item.embedding) for item in response.data])
 
     return embeddings

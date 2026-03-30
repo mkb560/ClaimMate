@@ -236,24 +236,23 @@ When this project is moved onto GitHub, use the repository root as the Git root.
 
 - Keep `main` always deployable
 - Use short-lived feature branches per task
-- Open pull requests instead of pushing directly to `main`
-- Ask for at least one teammate review before merge on shared or high-risk code
-- Merge quickly after approval to avoid long-lived branch drift
-- GitHub Actions now runs `Backend CI` on pull requests to `main` and on pushes to `main`
-- Use `CONTRIBUTING.md` and `.github/PULL_REQUEST_TEMPLATE.md` as the shared collaboration baseline
+- Use short-lived owner branches and sync back into `main` without pull requests
+- Push task branches early so work is backed up and visible to teammates
+- Coordinate in chat before editing high-coordination files or shared contracts
+- GitHub Actions now runs `Backend CI` on every branch push and on pushes to `main`
+- Use `CONTRIBUTING.md` and `TEAM_TASKS.md` as the shared collaboration baseline
 
 ### Branch naming examples
 
-- `feature/rag-query-routing`
-- `feature/chat-room-api`
-- `feature/accident-form-ui`
-- `fix/deadline-alert-copy`
+- `mingtao/rag-query-routing`
+- `ke/chat-room-api`
+- `lou/accident-form-ui`
 
 ### Coordination rules
 
 - Avoid editing the same files in parallel unless coordinated first
 - Treat `backend/models/ai_types.py` and shared API contracts as high-coordination files
-- When adding a new integration point between AI core and app layer, document the contract in both code comments and PR description
+- When adding a new integration point between AI core and app layer, document the contract in code comments and a short merge note for teammates
 - Keep `.env.example` updated whenever a new required environment variable is introduced
 
 ## Guidance For Future Agents
