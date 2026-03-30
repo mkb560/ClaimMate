@@ -7,6 +7,7 @@ This file gives coding agents the current source of truth for this repository.
 - As of 2026-03-29, this directory is an active Git repository cloned from GitHub.
 - The actual codebase in this repo is currently the **AI/backend scaffold** under `backend/`.
 - The repository root also contains the curated `claimmate_rag_docs/` directory for local KB-B indexing.
+- The repository root also contains `demo_policy_pdfs/` with sample real policy PDFs for KB-A/demo use; keep these separate from `claimmate_rag_docs/` so they are not indexed as KB-B.
 - Project-facing Markdown docs now live under `docs/` except for this `AGENTS.md` file.
 - The FastAPI app currently exposes `/health` plus minimal demo upload/ask routes in `backend/main.py`.
 - Most product behavior currently exists as reusable AI modules plus tests, not as fully wired API endpoints.

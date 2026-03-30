@@ -93,6 +93,14 @@ curl http://127.0.0.1:8000/health
 
 ## 5. 上传一份 policy PDF
 
+仓库里自带的 3 份 demo policy PDF 放在：
+
+```text
+demo_policy_pdfs/
+```
+
+如果你只是想快速演示，也可以直接从这里挑一份上传。
+
 ```bash
 curl -X POST "http://127.0.0.1:8000/cases/demo-case/policy" \
   -F "file=@/absolute/path/to/policy.pdf"

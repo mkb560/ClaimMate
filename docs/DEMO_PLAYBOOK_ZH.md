@@ -12,6 +12,8 @@
 | `allstate-renewal-2025-08` | `TEMP_PDF_FILE 2.pdf` | Allstate renewal packet | renewal package、optional coverage、法规时限 |
 | `progressive-verification-2026-03` | `Verification of Insurance.pdf` | Progressive verification letter | policy period、insurer、verification vs full policy、15-day rule |
 
+这 3 份 demo policy PDF 现在统一放在仓库根目录的 `demo_policy_pdfs/`，和 `claimmate_rag_docs/` 分开，避免被误当成 KB-B 法规资料一起索引。
+
 ## 固定 demo 顺序
 
 推荐现场演示顺序：

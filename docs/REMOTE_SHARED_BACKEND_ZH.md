@@ -106,7 +106,7 @@ POST https://abc123.ngrok-free.app/cases/demo-case/ask
 
 ## 可直接转发给 Ke 和 Lou 的消息模板
 
-下面这段你可以直接复制给他们。每次只需要把 `<当前 ngrok URL>` 替换成你这次启动后端后拿到的最新地址。
+下面这段是当前这次共享会话里可直接复制给他们的版本。以后如果你重新启动了 tunnel，只需要把里面的 URL 全部替换成新的地址。
 
 当前这次共享会话里，已经验证可用的地址是：
 
@@ -130,7 +130,7 @@ GET https://exasperatingly-unprologued-elease.ngrok-free.dev/health
 大家现在可以直接连我这边已经跑好的 ClaimMate 后端，不需要你们自己本地起 RAG、pgvector 或 OpenAI。
 
 当前公网 API base URL：
-<当前 ngrok URL>
+https://exasperatingly-unprologued-elease.ngrok-free.dev
 
 可用接口：
 - GET /health
@@ -138,9 +138,9 @@ GET https://exasperatingly-unprologued-elease.ngrok-free.dev/health
 - POST /cases/{case_id}/ask
 
 完整地址：
-- <当前 ngrok URL>/health
-- <当前 ngrok URL>/cases/{case_id}/policy
-- <当前 ngrok URL>/cases/{case_id}/ask
+- https://exasperatingly-unprologued-elease.ngrok-free.dev/health
+- https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/policy
+- https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/ask
 
 你们现在不需要自己做这些事：
 - 不需要本地起 pgvector
@@ -153,14 +153,14 @@ GET https://exasperatingly-unprologued-elease.ngrok-free.dev/health
 调用方式：
 
 1. 健康检查
-curl <当前 ngrok URL>/health
+curl https://exasperatingly-unprologued-elease.ngrok-free.dev/health
 
 2. 上传 policy PDF
-curl -X POST "<当前 ngrok URL>/cases/demo-case/policy" \
+curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/demo-case/policy" \
   -F "file=@/absolute/path/to/policy.pdf"
 
 3. 提问
-curl -X POST "<当前 ngrok URL>/cases/demo-case/ask" \
+curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/demo-case/ask" \
   -H "Content-Type: application/json" \
   -d '{"question":"Who are the policyholders and what is the policy number?"}'
 
