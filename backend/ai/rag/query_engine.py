@@ -48,6 +48,7 @@ async def _generate_rescue_answer(
 ) -> str:
     response = await client.chat.completions.create(
         model=ai_config.rag_model,
+        reasoning_effort=ai_config.rag_reasoning_effort,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT_RESCUE},
             {
@@ -88,6 +89,7 @@ async def _generate_answer(
     openai_client = client or get_openai_client()
     response = await openai_client.chat.completions.create(
         model=ai_config.rag_model,
+        reasoning_effort=ai_config.rag_reasoning_effort,
         messages=[
             {"role": "system", "content": system_prompt},
             {

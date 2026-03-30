@@ -26,8 +26,8 @@ This version replaces the older Qwen/DashScope plan. The backend AI scaffold is 
 
 | Component | Final Choice | Why |
 |---|---|---|
-| Primary LLM | `gpt-5.4-mini` | Strong mini model for grounded QA, coding, and lower-latency production use |
-| Classification LLM | `gpt-5.4-nano` | Cheapest GPT-5.4-class option for lightweight dispute routing |
+| Primary LLM | `gpt-5.4-mini` with `xhigh` reasoning | Strong mini model for grounded QA and higher-effort answer synthesis |
+| Classification LLM | `gpt-5.4-mini` with `xhigh` reasoning | Reuses the same GPT-5.4 mini family for dispute classification consistency |
 | Embeddings | `text-embedding-3-large` at 1536 dimensions | Better retrieval quality while staying compatible with the current `pgvector(1536)` schema |
 | Vector store | PostgreSQL + `pgvector` | Clean relational integration and case-level isolation |
 | DB access | shared `SQLAlchemy AsyncEngine` | One pool, one driver, easier handoff with Ke Wu's FastAPI app |
@@ -465,7 +465,9 @@ Current `AIConfig` shape:
 openai_api_key: str = ""
 openai_base_url: str = "https://api.openai.com/v1"
 rag_model: str = "gpt-5.4-mini"
-classification_model: str = "gpt-5.4-nano"
+rag_reasoning_effort: str = "xhigh"
+classification_model: str = "gpt-5.4-mini"
+classification_reasoning_effort: str = "xhigh"
 embedding_model: str = "text-embedding-3-large"
 database_url: str = ""
 

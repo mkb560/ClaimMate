@@ -11,7 +11,9 @@
 - 本地已经能用真实 PDF 跑问答，也能做 citations
 - 现在默认模型是：
   - `RAG_MODEL=gpt-5.4-mini`
-  - `CLASSIFICATION_MODEL=gpt-5.4-nano`
+  - `RAG_REASONING_EFFORT=xhigh`
+  - `CLASSIFICATION_MODEL=gpt-5.4-mini`
+  - `CLASSIFICATION_REASONING_EFFORT=xhigh`
   - `EMBEDDING_MODEL=text-embedding-3-large`
 - 为了兼容当前 `pgvector(1536)` 表结构，embedding 目前固定按 1536 维写入
 

@@ -33,6 +33,7 @@ async def classify_dispute(
     openai_client = client or get_openai_client()
     response = await openai_client.chat.completions.create(
         model=ai_config.classification_model,
+        reasoning_effort=ai_config.classification_reasoning_effort,
         response_format={"type": "json_object"},
         messages=[
             {
