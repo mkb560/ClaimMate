@@ -130,3 +130,17 @@ def test_cors_headers_allow_local_frontend_origin(monkeypatch, tmp_path: Path) -
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_cors_regex_allows_arbitrary_localhost_port(monkeypatch, tmp_path: Path) -> None:
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.options(
+            "/cases/demo-case/ask",
+            headers={
+                "Origin": "http://localhost:4321",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:4321"

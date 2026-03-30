@@ -97,6 +97,7 @@ cors_origins = ai_config.cors_allow_origins_list()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=ai_config.cors_allow_origin_regex_value(),
     allow_credentials="*" not in cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],

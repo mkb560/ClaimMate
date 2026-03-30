@@ -24,6 +24,7 @@ class AIConfig(BaseSettings):
         "http://localhost:3000,http://127.0.0.1:3000,"
         "http://localhost:5173,http://127.0.0.1:5173"
     )
+    cors_allow_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     database_url: str = ""
 
     aws_access_key_id: str = ""
@@ -66,6 +67,10 @@ class AIConfig(BaseSettings):
             if origin and origin not in origins:
                 origins.append(origin)
         return origins
+
+    def cors_allow_origin_regex_value(self) -> str | None:
+        value = self.cors_allow_origin_regex.strip()
+        return value or None
 
 
 @lru_cache(maxsize=1)

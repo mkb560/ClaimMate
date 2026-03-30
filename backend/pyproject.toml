@@ -21,6 +21,7 @@ dependencies = [
     "requests>=2.31.0",
     "sqlalchemy[asyncio]>=2.0.0",
     "tiktoken>=0.7.0",
+    "uvicorn>=0.30.0",
 ]
 
 [project.optional-dependencies]

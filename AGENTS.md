@@ -8,7 +8,7 @@ This file gives coding agents the current source of truth for this repository.
 - The actual codebase in this repo is currently the **AI/backend scaffold** under `backend/`.
 - The repository root also contains the curated `claimmate_rag_docs/` directory for local KB-B indexing.
 - Project-facing Markdown docs now live under `docs/` except for this `AGENTS.md` file.
-- The FastAPI app currently exposes only a minimal `/health` route in `backend/main.py`.
+- The FastAPI app currently exposes `/health` plus minimal demo upload/ask routes in `backend/main.py`.
 - Most product behavior currently exists as reusable AI modules plus tests, not as fully wired API endpoints.
 
 ## Product Context
@@ -51,6 +51,7 @@ backend/
   - Minimal demo REST routes now include:
     - `POST /cases/{case_id}/policy` for local policy PDF upload + KB-A indexing
     - `POST /cases/{case_id}/ask` for policy question answering with citations
+  - CORS now allows localhost-style frontend origins through both explicit origins and a localhost regex, which supports teammates calling a shared remote backend from their own local frontend dev servers
   - Does **not** yet wire the full chat/dispute/deadline flows into REST routes or WebSocket handlers
 
 - `backend/ai/config.py`
@@ -122,6 +123,7 @@ backend/
 - If the first generation pass returns a grounded fallback response, the RAG layer performs a narrower rescue pass over top snippets before giving up
 - All final answers append a fixed disclaimer
 - Demo app uploads local PDFs into `backend/.local_data/policies/<case_id>/` before indexing them into KB-A
+- For short-term remote collaboration, teammates can call one shared backend over a public tunnel instead of each running their own local RAG stack
 
 ### Chat AI
 
@@ -216,6 +218,9 @@ Use `backend/.env.example` as the template. Current variables:
 - `CLASSIFICATION_REASONING_EFFORT`
 - `EMBEDDING_MODEL`
 - `CORS_ALLOW_ORIGINS`
+- `CORS_ALLOW_ORIGIN_REGEX`
+- `APP_HOST`
+- `APP_PORT`
 - `DATABASE_URL`
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
@@ -228,6 +233,7 @@ Use `backend/.env.example` as the template. Current variables:
 - In this repo, `./.venv/bin/pytest` is the reliable command
 - Local KB-B indexing requires both a working `DATABASE_URL` and an `OPENAI_API_KEY` with available quota
 - The local demo/eval suite can be run with `DATABASE_URL=... OPENAI_API_KEY=... ./.venv/bin/python scripts/run_demo_eval.py`
+- A short-term remote sharing workflow is documented in `docs/REMOTE_SHARED_BACKEND_ZH.md`, and `backend/scripts/run_shared_backend.sh` can be used to expose the local backend through ngrok for teammates
 
 ## GitHub Collaboration Recommendations
 
