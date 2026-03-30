@@ -10,6 +10,7 @@ This folder collects the project-facing Markdown documentation for ClaimMate.
 
 ## Demo and integration docs
 
+- `ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
 - `DEMO_PLAYBOOK_ZH.md`
 - `REMOTE_SHARED_BACKEND_ZH.md`
 - `RUN_DEMO_ZH.md`

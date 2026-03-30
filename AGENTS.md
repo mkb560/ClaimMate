@@ -32,6 +32,7 @@ backend/
 ├── requirements.txt
 ├── .env.example
 ├── ai/
+│   ├── accident/
 │   ├── clients.py
 │   ├── config.py
 │   ├── chat/
@@ -41,6 +42,7 @@ backend/
 │   ├── policy/
 │   └── rag/
 ├── models/
+│   ├── accident_types.py
 │   └── ai_types.py
 └── tests/
 ```
@@ -58,6 +60,10 @@ backend/
 - `backend/ai/config.py`
   - Centralized environment-based configuration using `pydantic-settings`
   - Defines model names, DB URL, S3 settings, vector settings, chunk sizes, and deadline thresholds
+
+- `backend/ai/accident/`
+  - `report_payload_builder.py`: deterministic builder that converts Stage A + Stage B accident intake data into a standardized report payload plus chat-ready context
+  - This module defines the technical contract for the second product pillar before Ke wires app routes and Lou wires the full intake UI
 
 - `backend/ai/clients.py`
   - Lazily creates a cached `AsyncOpenAI` client
@@ -102,8 +108,11 @@ backend/
 - `backend/models/ai_types.py`
   - Shared dataclasses and enums for chat stages, triggers, citations, events, and response payloads
 
+- `backend/models/accident_types.py`
+  - Shared dataclasses and enums for the two-stage accident intake flow, standardized accident report payloads, and chat-ready accident context
+
 - `backend/tests/`
-  - Deterministic tests for mention parsing, stage routing, deadline math, dispute keyword logic, citations, local KB-B source discovery, and chat orchestration
+  - Deterministic tests for mention parsing, stage routing, deadline math, dispute keyword logic, citations, local KB-B source discovery, chat orchestration, and accident payload contracts
 
 - `backend/scripts/`
   - `index_local_kb_b.py`: indexes local files from `claimmate_rag_docs/` into PostgreSQL + `pgvector`
@@ -138,6 +147,14 @@ backend/
   - keyword-triggered dispute escalation
   - fallback deadline reminder checks
 - Stage 3 answers are prefixed with `For reference:` to keep the tone neutral in multi-party chat
+
+### Accident workflow contract
+
+- The second product pillar now has a shared technical contract, even though the full accident intake UI and PDF generator are not yet wired
+- `StageAAccidentIntake` captures on-scene facts, photos, and basic party data
+- `StageBAccidentIntake` captures the at-home follow-up details, witness info, police report number, and additional notes
+- `build_accident_report_payload(...)` produces a stable intermediate payload for future PDF generation
+- `build_accident_chat_context(...)` produces the future pinned-document/chat context that Ke can attach when group chat is created
 
 ### Deadline reminders
 
@@ -174,6 +191,7 @@ Do **not** assume the following already exist in this repo:
 
 - full authentication flows
 - case CRUD routes
+- accident intake API routes
 - chat REST API
 - WebSocket room management
 - Stripe checkout or webhook handling
@@ -235,6 +253,7 @@ Use `backend/.env.example` as the template. Current variables:
 - Local KB-B indexing requires both a working `DATABASE_URL` and an `OPENAI_API_KEY` with available quota
 - The local demo/eval suite can be run with `DATABASE_URL=... OPENAI_API_KEY=... ./.venv/bin/python scripts/run_demo_eval.py`
 - A short-term remote sharing workflow is documented in `docs/REMOTE_SHARED_BACKEND_ZH.md`, and `backend/scripts/run_shared_backend.sh` can be used to expose the local backend through ngrok for teammates
+- The second product pillar contract is documented in `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
 
 ## GitHub Collaboration Recommendations
 

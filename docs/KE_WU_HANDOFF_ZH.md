@@ -6,9 +6,16 @@
 
 当前仓库里，AI 核心已经有了，但产品层还很薄。
 
-- `backend/main.py` 现在只有 `/health`
+- `backend/main.py` 现在已经有：
+  - `GET /health`
+  - `POST /cases/{case_id}/policy`
+  - `POST /cases/{case_id}/ask`
 - RAG、本地 policy ingest、KB-B indexing、dispute detection、deadline checker、chat AI scaffold 都已经在 `backend/ai/` 里
 - 本地已经能用真实 PDF 跑问答，也能做 citations
+- 第二主线的数据契约也已经先定下来了：
+  - `backend/models/accident_types.py`
+  - `backend/ai/accident/report_payload_builder.py`
+  - `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
 - 现在默认模型是：
   - `RAG_MODEL=gpt-5.4-mini`
   - `RAG_REASONING_EFFORT=xhigh`
@@ -29,11 +36,22 @@ AI 核心已经能单独跑，但还没有被包装成前端可直接调用的 A
 1. 把数据库 engine 和 vector store bootstrap 接进 FastAPI 启动流程
 2. 定义最小可用的 `cases` 数据结构和相关字段
 3. 做最小 API，让前端能上传 policy、提问、拿回答
-4. 如果来得及，再补 claim dates 更新和 chat 入口
+4. 把第二主线的事故表单数据、报告生成入口和后续 chat 衔接接进应用层
+5. 如果来得及，再补 claim dates 更新和 chat 入口
 
-## 你第一阶段最该做的 4 件事
+## 你第一阶段最该做的 5 件事
 
-### 1. 接 FastAPI 启动
+### 1. 先沿用现在已经有的 demo API
+
+现在 upload / ask 这条 demo 路已经有最小可用版本，你不需要从零重新造一遍。
+
+你优先要做的是：
+
+- 决定这些路由后面是继续保留在 `main.py`，还是抽到 app-layer router
+- 确认 case 层和未来前端对接时，request / response 不会再频繁变
+- 在不破坏当前 demo 的前提下，逐步把它们接到真正的 case/app schema
+
+### 2. 接 FastAPI 启动
 
 目标：
 - 应用启动时就能初始化 AI 使用的数据库连接
@@ -49,7 +67,7 @@ AI 核心已经能单独跑，但还没有被包装成前端可直接调用的 A
 - 调用 bootstrap
 - 后续 route 可以直接用现有 AI 模块
 
-### 2. 定义最小 `cases` 层
+### 3. 定义最小 `cases` 层
 
 现在 AI 模块默认依赖这些字段：
 
@@ -67,25 +85,32 @@ AI 核心已经能单独跑，但还没有被包装成前端可直接调用的 A
 - `vector_documents.case_id` 现在还是字符串占位
 - 如果你要把主表做成 UUID，也请和 Mingtao 先对齐
 
-### 3. 先做两个最小 API
+### 4. 接第二主线的事故数据流
 
-第一批不要铺太大，先把 demo 路打通。
+这部分现在 Mingtao 已经先把共享契约定好了，但还没有接进真实 API。
 
-建议优先做：
+你要看的文件：
 
-- `POST /cases/{case_id}/policy`
-  - 接收 policy 文件
-  - 调 ingestion
-  - 返回 ingest 结果
+- `backend/models/accident_types.py`
+- `backend/ai/accident/report_payload_builder.py`
+- `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
 
-- `POST /cases/{case_id}/ask`
-  - 接收用户问题
-  - 调 `answer_policy_question(...)`
-  - 返回 answer + citations
+你后面要接的产品层入口，建议是：
 
-只要这两个能跑，Lou 那边就能先把 upload + ask 的 demo 页面接起来。
+- `POST /cases`
+- `PATCH /cases/{case_id}/accident/stage-a`
+- `PATCH /cases/{case_id}/accident/stage-b`
+- `POST /cases/{case_id}/accident/report`
+- `GET /cases/{case_id}/accident/report`
 
-### 4. 如果还有时间，再做日期/聊天入口
+你在第二主线最重要的职责是：
+
+- 存事故表单数据
+- 调 builder 生成标准化 report payload
+- 把 payload 交给 PDF generator
+- 再把 report / summary 接到后面的 group chat room
+
+### 5. 如果还有时间，再做日期/聊天入口
 
 第二批建议你补：
 
@@ -107,7 +132,7 @@ AI 核心已经能单独跑，但还没有被包装成前端可直接调用的 A
 - 完整 production migration system
 
 原因很简单：
-现在最缺的不是“完整平台”，而是“能演示 AI 已经接进产品里”。
+现在最缺的不是“完整平台”，而是“能演示完整事故处理主线已经接进产品里”。
 
 ## 你和 Mingtao 的接口边界
 
@@ -157,10 +182,10 @@ cd backend
 
 当前阶段，希望你交出来的是：
 
-- 一个能启动的 FastAPI app，不只是 `/health`
-- 一个可用的 upload policy endpoint
-- 一个可用的 ask-AI endpoint
+- 一个稳定的 app-layer FastAPI 结构，不只是 demo route
 - 一个最小 `cases` 方案
+- 第二主线的事故 intake / report 相关 API
+- upload / ask 继续可用，不要回退
 - 给 Lou 的接口说明或样例 payload
 
-如果你先把这几件事做好，整个项目就会从“AI scaffold”变成“可交互 demo”。
+如果你先把这些做好，项目就会从“RAG demo”变成“事故流程 + AI + 后续 chat 都能接上的产品雏形”。

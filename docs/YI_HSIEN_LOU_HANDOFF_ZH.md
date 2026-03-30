@@ -13,8 +13,13 @@
   - dispute detection
   - deadline reminder logic
   - chat AI scaffold
-- 后端产品入口现在还很薄：
-  - `backend/main.py` 只有 `/health`
+- 后端产品入口现在已经有最小 demo API：
+  - `GET /health`
+  - `POST /cases/{case_id}/policy`
+  - `POST /cases/{case_id}/ask`
+- 第二主线的共享 schema 也已经先定好了：
+  - `backend/models/accident_types.py`
+  - `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
 - 也就是说：
   - AI 能力是有的
   - 但是用户还没有一个顺手的界面去体验这些能力
@@ -38,7 +43,23 @@
 
 ## 你第一阶段最该做的 4 件事
 
-### 1. 先做 happy path，不要一开始做全量系统
+### 1. 先把第二主线的 Stage A / Stage B 做成可用前端流程
+
+这部分现在最值得你先动，因为 schema 已经先定好了，不需要你自己重新发明字段。
+
+你要先看的文件：
+
+- `backend/models/accident_types.py`
+- `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
+
+你前端最适合先做的是：
+
+- Stage A：现场快速收集
+- Stage B：回家后补充
+- 事故照片 checklist
+- 事故报告预览壳子
+
+### 2. 先做 happy path，不要一开始做全量系统
 
 先只做这条 demo 路：
 
@@ -49,7 +70,14 @@
 
 只要这条链路顺了，整个项目就已经能 demo。
 
-### 2. 先做页面壳子，就算后端接口还没全好也可以先动
+但如果你们想更贴近 proposal 里的完整故事，建议同时并行做这条第二主线：
+
+1. 用户进入事故表单
+2. 先完成 Stage A
+3. 再补 Stage B
+4. 预览标准化事故报告
+
+### 3. 先做页面壳子，就算后端接口还没全好也可以先动
 
 如果 Ke 的接口还没完全 ready，你也可以先用 mock data 做页面。
 
@@ -62,7 +90,7 @@
 
 你不用等所有 API 都做好才开始。
 
-### 3. UI 上要突出“保险理赔助手”的感觉
+### 4. UI 上要突出“保险理赔助手”的感觉
 
 当前最值得展示的不是复杂动效，而是“这个产品真的能帮用户理解保单和理赔时限”。
 
@@ -77,16 +105,17 @@
 比起很炫的界面，更重要的是让老师一眼看懂：
 这个工具能帮助普通用户处理车险 claim。
 
-### 4. 如果 chat 来不及，就先把问答体验做扎实
+### 5. 如果 chat 来不及，就先把问答体验和事故表单体验做扎实
 
 现阶段 chat 不是唯一必须项。
 
 如果时间有限，优先级建议是：
 
-1. upload + ask
-2. answer + citations 展示
-3. case summary
-4. chat UI
+1. Stage A / Stage B 表单
+2. upload + ask
+3. answer + citations 展示
+4. case summary / report preview
+5. chat UI
 
 ## 你现在先不要花太多时间做的事
 
@@ -117,12 +146,16 @@
 - ask endpoint 长什么样
 - request / response JSON 怎么定义
 - case 页面需要哪些字段
+- Stage A / Stage B 的接口怎么定义
+- report preview / report download 怎么接
 
 ### 和 Mingtao 对齐
 
 - demo 时最适合展示的 3 到 5 个问题
 - citation 怎么展示更清楚
 - 哪些回答适合做“推荐问题”
+- 事故表单字段不要偏离 `accident_types.py`
+- 事故报告预览优先围绕 `AccidentReportPayload`
 
 ## 你当前推荐分支
 
@@ -150,9 +183,11 @@ git push -u origin lou/demo-ui
 
 当前阶段，希望你交出来的是：
 
+- 一个清楚的 Stage A / Stage B 事故表单流程
 - 一个干净可演示的 upload 页面
 - 一个 case 页面或问答页面
 - 一个清楚展示 AI answer + citation 的组件
+- 一个事故报告预览壳子
 - 如果来得及，再补一个简版 chat 界面
 
-如果你先把这些做出来，哪怕系统还不是完整产品，整个 demo 也会已经很像一个能交差、能展示、能讲故事的作品。
+如果你先把这些做出来，proposal 里的第二主线就会真正有产品形态，不再只是概念图。
