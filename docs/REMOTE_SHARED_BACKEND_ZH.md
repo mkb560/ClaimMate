@@ -104,6 +104,80 @@ POST https://abc123.ngrok-free.app/cases/demo-case/ask
 
 如果 Lou 本地前端在 `http://localhost:3000` 或 `http://localhost:5173`，当前后端默认已经允许跨域。
 
+## 可直接转发给 Ke 和 Lou 的消息模板
+
+下面这段你可以直接复制给他们。每次只需要把 `<当前 ngrok URL>` 替换成你这次启动后端后拿到的最新地址。
+
+当前这次共享会话里，已经验证可用的地址是：
+
+```text
+https://exasperatingly-unprologued-elease.ngrok-free.dev
+```
+
+这个地址在 **2026-03-30** 已经通过：
+
+```text
+GET https://exasperatingly-unprologued-elease.ngrok-free.dev/health
+```
+
+返回：
+
+```json
+{"status":"ok","ai_ready":true,"ai_bootstrap_error":null}
+```
+
+```text
+大家现在可以直接连我这边已经跑好的 ClaimMate 后端，不需要你们自己本地起 RAG、pgvector 或 OpenAI。
+
+当前公网 API base URL：
+<当前 ngrok URL>
+
+可用接口：
+- GET /health
+- POST /cases/{case_id}/policy
+- POST /cases/{case_id}/ask
+
+完整地址：
+- <当前 ngrok URL>/health
+- <当前 ngrok URL>/cases/{case_id}/policy
+- <当前 ngrok URL>/cases/{case_id}/ask
+
+你们现在不需要自己做这些事：
+- 不需要本地起 pgvector
+- 不需要本地重新 ingest PDF
+- 不需要本地 OpenAI API key
+- 不需要本地重跑 RAG
+
+你们只要直接调我这个 API 就行。现在数据和模型都跑在我电脑上。
+
+调用方式：
+
+1. 健康检查
+curl <当前 ngrok URL>/health
+
+2. 上传 policy PDF
+curl -X POST "<当前 ngrok URL>/cases/demo-case/policy" \
+  -F "file=@/absolute/path/to/policy.pdf"
+
+3. 提问
+curl -X POST "<当前 ngrok URL>/cases/demo-case/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Who are the policyholders and what is the policy number?"}'
+
+建议：
+- Ke 先按这个 base URL 接后端接口
+- Lou 先把前端 API base URL 指到这个地址，直接做 upload + ask 的 happy path
+
+注意：
+- 这个地址是临时共享地址，如果我重启服务或 tunnel，URL 可能会变
+- 如果你们调接口时报错，先把报错原文发我
+
+文档也已经在仓库里：
+- docs/REMOTE_SHARED_BACKEND_ZH.md
+- docs/KE_API_CONTRACT_ZH.md
+- docs/YI_FRONTEND_API_EXAMPLE_ZH.md
+```
+
 ## 最小联调流程
 
 推荐你们这样协作：
