@@ -239,6 +239,8 @@ When this project is moved onto GitHub, use the repository root as the Git root.
 - Open pull requests instead of pushing directly to `main`
 - Ask for at least one teammate review before merge on shared or high-risk code
 - Merge quickly after approval to avoid long-lived branch drift
+- GitHub Actions now runs `Backend CI` on pull requests to `main` and on pushes to `main`
+- Use `CONTRIBUTING.md` and `.github/PULL_REQUEST_TEMPLATE.md` as the shared collaboration baseline
 
 ### Branch naming examples
 
