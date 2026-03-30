@@ -116,3 +116,17 @@ def test_health_endpoint_reports_ai_ready(monkeypatch, tmp_path: Path) -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["ai_ready"] is True
+
+
+def test_cors_headers_allow_local_frontend_origin(monkeypatch, tmp_path: Path) -> None:
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.options(
+            "/cases/demo-case/ask",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"

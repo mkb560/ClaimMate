@@ -6,6 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from ai.config import ai_config
@@ -91,6 +92,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ClaimMate Backend", version="0.1.0", lifespan=lifespan)
+
+cors_origins = ai_config.cors_allow_origins_list()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials="*" not in cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")

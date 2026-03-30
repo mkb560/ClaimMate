@@ -20,6 +20,10 @@ class AIConfig(BaseSettings):
     classification_model: str = "gpt-5.4-mini"
     classification_reasoning_effort: str = "xhigh"
     embedding_model: str = "text-embedding-3-large"
+    cors_allow_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5173,http://127.0.0.1:5173"
+    )
     database_url: str = ""
 
     aws_access_key_id: str = ""
@@ -50,6 +54,18 @@ class AIConfig(BaseSettings):
     def require_database(self) -> None:
         if not self.database_url:
             raise RuntimeError("DATABASE_URL is required for database-backed AI operations.")
+
+    def cors_allow_origins_list(self) -> list[str]:
+        raw_value = self.cors_allow_origins.strip()
+        if raw_value == "*":
+            return ["*"]
+
+        origins: list[str] = []
+        for item in raw_value.split(","):
+            origin = item.strip().rstrip("/")
+            if origin and origin not in origins:
+                origins.append(origin)
+        return origins
 
 
 @lru_cache(maxsize=1)
