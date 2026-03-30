@@ -7,7 +7,7 @@ This file gives coding agents the current source of truth for this repository.
 - As of 2026-03-29, this directory is an active Git repository cloned from GitHub.
 - The actual codebase in this repo is currently the **AI/backend scaffold** under `backend/`.
 - The repository root also contains the curated `claimmate_rag_docs/` directory for local KB-B indexing.
-- The root folder may also contain planning documents such as `plan.md`, but those are not application runtime code.
+- Project-facing Markdown docs now live under `docs/` except for this `AGENTS.md` file.
 - The FastAPI app currently exposes only a minimal `/health` route in `backend/main.py`.
 - Most product behavior currently exists as reusable AI modules plus tests, not as fully wired API endpoints.
 
@@ -246,7 +246,7 @@ When this project is moved onto GitHub, use the repository root as the Git root.
 - Push task branches early so work is backed up and visible to teammates
 - Coordinate in chat before editing high-coordination files or shared contracts
 - GitHub Actions now runs `Backend CI` on every branch push and on pushes to `main`
-- Use `CONTRIBUTING.md` and `TEAM_TASKS.md` as the shared collaboration baseline
+- Use `docs/CONTRIBUTING.md` and `docs/TEAM_TASKS.md` as the shared collaboration baseline
 
 ### Branch naming examples
 
@@ -263,7 +263,7 @@ When this project is moved onto GitHub, use the repository root as the Git root.
 
 ## Guidance For Future Agents
 
-- Read `plan.md` for project intent, but treat the code under `backend/` as the final authority for what is actually implemented
+- Read `docs/plan.md` for project intent, but treat the code under `backend/` as the final authority for what is actually implemented
 - Do not describe this repository as a complete full-stack app unless that code has been added
 - Prefer updating tests when changing AI orchestration or parsing behavior
 - After modifying backend code, run `./.venv/bin/pytest`
