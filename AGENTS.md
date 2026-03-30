@@ -47,8 +47,11 @@ backend/
 ### Implemented modules
 
 - `backend/main.py`
-  - Minimal FastAPI app with `/health`
-  - Does **not** yet wire the AI modules into REST routes or WebSocket handlers
+  - FastAPI app with `/health`
+  - Minimal demo REST routes now include:
+    - `POST /cases/{case_id}/policy` for local policy PDF upload + KB-A indexing
+    - `POST /cases/{case_id}/ask` for policy question answering with citations
+  - Does **not** yet wire the full chat/dispute/deadline flows into REST routes or WebSocket handlers
 
 - `backend/ai/config.py`
   - Centralized environment-based configuration using `pydantic-settings`
@@ -118,6 +121,7 @@ backend/
 - `answer_dispute_question(...)` narrows regulatory retrieval to dispute-relevant documents and applies stage-specific instructions
 - If the first generation pass returns a grounded fallback response, the RAG layer performs a narrower rescue pass over top snippets before giving up
 - All final answers append a fixed disclaimer
+- Demo app uploads local PDFs into `backend/.local_data/policies/<case_id>/` before indexing them into KB-A
 
 ### Chat AI
 
