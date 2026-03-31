@@ -1,0 +1,14 @@
+{
+  "doc_id": "string",
+  "file_name": "string",
+  "document_type": "policy | regulation | consumer_guide",
+  "source_name": "string",
+  "jurisdiction": "CA | US | policy-specific",
+  "page": "number",
+  "section": "string",
+  "section_root": "string",
+  "title": "string",
+  "coverage_category": "claims_handling | auto_claims | repair_rights | general_policy",
+  "content_type": "definition | rule | guidance | coverage_clause",
+  "chunk_id": "string"
+}

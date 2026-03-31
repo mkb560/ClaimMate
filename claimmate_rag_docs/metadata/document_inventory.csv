@@ -1,0 +1,16 @@
+doc_id,file_name,document_type,source_name,jurisdiction,section_root,coverage_category,status,notes
+policy_statefarm_01,policy_sample_01_statefarm_personal_car_policy.pdf,policy,State Farm,policy-specific,policy_main,general_policy,ready,public insurer policy booklet
+policy_natgen_ca_02,policy_sample_02_national_general_ca_personal_auto_policy.pdf,policy,National General,CA,policy_main,general_policy,ready,california personal auto policy
+policy_natgen_03,policy_sample_03_national_general_personal_auto_policy.pdf,policy,National General,policy-specific,policy_main,general_policy,ready,public personal auto policy
+policy_nv_04,policy_sample_04_nv_personal_auto_policy.pdf,policy,Nevada DOI / public form,US,policy_main,general_policy,ready,public auto policy form
+ca_reg_2695_2,ca_reg_2695_2_definitions.pdf,regulation,California Department of Insurance,CA,2695.2,claims_handling,ready,definitions section
+ca_reg_2695_3,ca_reg_2695_3_file_record_documentation.pdf,regulation,California Department of Insurance,CA,2695.3,claims_handling,ready,file and record documentation
+ca_reg_2695_4,ca_reg_2695_4_policy_provisions_benefits.pdf,regulation,California Department of Insurance,CA,2695.4,claims_handling,ready,policy provisions and benefits
+ca_reg_2695_5,ca_reg_2695_5_duties_upon_receipt_of_communications.pdf,regulation,California Department of Insurance,CA,2695.5,claims_handling,ready,communication duties
+ca_reg_2695_7,ca_reg_2695_7_prompt_fair_equitable_settlements.pdf,regulation,California Department of Insurance,CA,2695.7,claims_handling,ready,prompt fair settlements
+ca_reg_2695_8,ca_reg_2695_8_auto_insurance_standards.pdf,regulation,California Department of Insurance,CA,2695.8,auto_claims,ready,auto insurance standards
+ca_reg_2695_85,ca_reg_2695_85_auto_body_repair_consumer_bill_of_rights.pdf,regulation,California Department of Insurance,CA,2695.85,repair_rights,ready,consumer bill of rights
+ca_accident_2024,ca_accident_whats_next_2024.pdf,consumer_guide,California Department of Insurance,CA,guide,auto_claims,ready,post accident guide
+ca_auto_guide_2025,ca_auto_insurance_guide_2025.pdf,consumer_guide,California Department of Insurance,CA,guide,general_policy,ready,auto insurance guide
+ca_claims_mediation,ca_claims_mediation_program.pdf,consumer_guide,California Department of Insurance,CA,guide,claims_handling,ready,mediation guide
+naic_auto_claims,naic_consumer_guide_auto_claims.pdf,consumer_guide,NAIC,US,guide,auto_claims,ready,national consumer guide
