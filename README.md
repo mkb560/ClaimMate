@@ -1,0 +1,265 @@
+# ClaimMate
+
+ClaimMate 是一个面向车主的 AI 理赔助手原型项目。它的目标不是站在保险公司一侧优化流程，而是站在投保人一侧，帮助用户理解保单、梳理事故材料、跟踪理赔时限，并在后续沟通中提供有依据的 AI 支持。
+
+当前这个仓库已经不是单纯的想法文档，而是一个可运行的后端原型：
+
+- 支持上传真实 policy PDF
+- 支持基于保单和法规做双知识源 RAG 问答
+- 支持返回 grounded answer + citations
+- 支持本地 `pgvector` 向量检索
+- 支持通过临时公网地址把你本机后端共享给远程队友联调
+
+不过它还不是完整生产产品。更准确地说，它现在是“AI core 已经打通、产品层正在继续接”的课程项目原型。
+
+## 项目目标
+
+ClaimMate 的完整产品故事有三条主线：
+
+1. 双知识源 RAG
+2. 两阶段事故信息收集与报告生成
+3. 后续理赔群聊中的 AI 支持
+
+当前仓库里，第一条主线已经最完整；第二条主线目前已经有共享数据契约和报告 payload builder；第三条主线的 AI 逻辑模块已经存在，但完整的群聊产品层还没有完全接起来。
+
+## 当前已经实现了什么
+
+### 1. Dual-Knowledge RAG
+
+后端现在支持：
+
+- `KB-A`：用户上传的保单 PDF
+- `KB-B`：California / U.S. 相关法规与参考资料
+- 基于 `OpenAI + pgvector + SQLAlchemy AsyncEngine` 的检索链路
+- 基于 `gpt-5.4-mini` 的 grounded answer generation
+- 引用来源展示（citations）
+- 保单字段的确定性抽取优先于普通生成式回答
+
+相关核心代码在：
+
+- `backend/ai/ingestion/`
+- `backend/ai/rag/`
+- `backend/ai/policy/`
+
+### 2. 第二主线技术骨架
+
+事故流程的共享技术契约已经先落地，包括：
+
+- `StageAAccidentIntake`
+- `StageBAccidentIntake`
+- `AccidentReportPayload`
+- `AccidentChatContext`
+- 事故数据到标准化报告 payload 的确定性 builder
+
+相关代码在：
+
+- `backend/models/accident_types.py`
+- `backend/ai/accident/report_payload_builder.py`
+
+这部分的目标是先把字段和中间层结构定死，方便后面 Ke 接 API / 存储、Lou 接前端表单和报告预览。
+
+### 3. 最小后端 API
+
+当前 FastAPI 已经提供：
+
+- `GET /health`
+- `POST /cases/{case_id}/policy`
+- `POST /cases/{case_id}/ask`
+
+也就是说，前端现在已经可以围绕“上传保单 + 提问 + 展示 AI 回答”这条 demo 路直接联调。
+
+### 4. 远程共享后端
+
+如果队友不在同一地点，也不想各自本地重建 RAG，可以直接连接你这台机器已经跑好的后端。
+
+仓库里已经提供：
+
+- `backend/scripts/run_shared_backend.sh`
+- `docs/REMOTE_SHARED_BACKEND_ZH.md`
+
+它会用 `ngrok` 把你本机的 `FastAPI` 服务暴露成临时公网地址，方便 Ke 和 Lou 直接联调。
+
+## 当前没有完全做完的部分
+
+下面这些能力在 proposal 里有，但当前仓库还没有完全落地：
+
+- 完整事故表单前端流程
+- 真正的 PDF 事故报告生成文件
+- 完整 chat room / WebSocket 产品层
+- invite link 免注册加入房间
+- payment / Stripe
+- 完整部署体系
+- 完整 case CRUD 和正式数据库迁移
+
+所以请把当前项目理解成：
+
+- 已经可运行的 AI 后端原型
+- 已经可 demo 的 upload + ask 链路
+- 正在继续往完整产品故事靠拢
+
+## 仓库结构
+
+```text
+ClaimMate/
+├── AGENTS.md
+├── README.md
+├── backend/
+├── claimmate_rag_docs/
+├── demo_policy_pdfs/
+└── docs/
+```
+
+### `backend/`
+
+核心后端代码都在这里：
+
+- `main.py`：FastAPI 入口
+- `ai/`：AI 核心逻辑
+- `models/`：共享数据结构
+- `tests/`：自动化测试
+- `scripts/`：本地索引、查询、demo、共享后端脚本
+
+### `claimmate_rag_docs/`
+
+本地 KB-B 法规与参考资料目录，用来做 regulatory corpus 索引。
+
+### `demo_policy_pdfs/`
+
+仓库内自带的 demo policy PDF 样例。它们是给 KB-A / demo 用的，不应该和 `claimmate_rag_docs/` 混在一起索引。
+
+### `docs/`
+
+项目文档、联调说明、协作规则、demo 说明、handoff 文件都放在这里。
+
+## 当前技术栈
+
+- LLM：`gpt-5.4-mini`
+- Embeddings：`text-embedding-3-large`（按 1536 维写入，兼容当前 `pgvector(1536)`）
+- 向量库：PostgreSQL + `pgvector`
+- 后端：FastAPI
+- ORM / DB 接入：SQLAlchemy AsyncEngine + psycopg
+- PDF 解析：`pdfplumber` + `pypdf`
+- HTML 解析：`html2text`
+- Token chunking：`tiktoken`
+
+## 快速开始
+
+### 1. 启动 pgvector
+
+```bash
+docker pull --platform linux/arm64 pgvector/pgvector:pg16
+docker run -d --platform linux/arm64 \
+  --name claimmate-pgvector \
+  -e POSTGRES_USER=claimmate \
+  -e POSTGRES_PASSWORD=claimmate \
+  -e POSTGRES_DB=claimmate \
+  -p 5433:5432 \
+  pgvector/pgvector:pg16
+```
+
+### 2. 安装依赖
+
+```bash
+cd backend
+python3 -m venv .venv
+./.venv/bin/pip install -r requirements.txt
+./.venv/bin/pip install -e '.[dev]'
+```
+
+### 3. 配置环境变量
+
+最小需要：
+
+```bash
+export OPENAI_API_KEY="your_key"
+export DATABASE_URL="postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate"
+```
+
+### 4. 启动后端
+
+```bash
+cd backend
+./.venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 5. 健康检查
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+### 6. 上传保单并提问
+
+```bash
+curl -X POST "http://127.0.0.1:8000/cases/demo-case/policy" \
+  -F "file=@/absolute/path/to/policy.pdf"
+
+curl -X POST "http://127.0.0.1:8000/cases/demo-case/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Who are the policyholders and what is the policy number?"}'
+```
+
+更完整的本地 demo 运行方式见：
+
+- `docs/RUN_DEMO_ZH.md`
+
+## 共享给远程队友
+
+如果 Ke 和 Lou 不想自己本地起 RAG，可以直接连你这台机器的后端。
+
+使用：
+
+```bash
+cd backend
+export DATABASE_URL="postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate"
+./scripts/run_shared_backend.sh
+```
+
+更多说明见：
+
+- `docs/REMOTE_SHARED_BACKEND_ZH.md`
+
+## 测试
+
+当前后端测试命令：
+
+```bash
+cd backend
+./.venv/bin/pytest
+```
+
+当前仓库最近一次回归状态已经到：
+
+```text
+37 passed
+```
+
+## 团队分工
+
+- Mingtao Ding：AI core、RAG、dispute、deadline、第二主线技术契约
+- Ke Wu：FastAPI integration、case/app layer、chat backend、deployment
+- Yi-Hsien Lou：事故表单、前端体验、PDF/report UX、演示流程
+
+## 重要文档入口
+
+- 文档索引：`docs/README.md`
+- 详细 AI 方案：`docs/plan.md`
+- 第二主线契约：`docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
+- 本地 demo 运行：`docs/RUN_DEMO_ZH.md`
+- 远程共享后端：`docs/REMOTE_SHARED_BACKEND_ZH.md`
+- Ke handoff：`docs/KE_WU_HANDOFF_ZH.md`
+- Lou handoff：`docs/YI_HSIEN_LOU_HANDOFF_ZH.md`
+
+## 当前最适合继续做的事
+
+如果你们接下来继续按 proposal 推进，最优先的是：
+
+1. 把第二主线的事故表单和报告生成接进产品层
+2. 把第三主线的 chat room / invite link 接起来
+3. 把现有 AI 后端从 demo 形态继续收成完整用户旅程
+
+如果只是先准备课程 demo，那最优先的是：
+
+1. 保证 upload + ask 稳定
+2. 保证远程共享地址可用
+3. 固定演示问题和展示顺序
