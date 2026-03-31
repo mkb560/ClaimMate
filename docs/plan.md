@@ -1,46 +1,59 @@
-# ClaimMate — Mingtao Ding AI Core MVP Plan (Synced To Current Backend Scaffold)
+# ClaimMate — Mingtao Ding AI Core MVP 方案（已同步到当前后端脚手架）
 
-## Context
+## 背景
 
-Mingtao owns the AI core for ClaimMate: dual-knowledge RAG, dispute detection, deadline reminders, and group chat AI behavior. This document is the **current source of truth** for the MVP backend scaffold that now exists under `backend/` in the project repo.
+Mingtao 当前负责 ClaimMate 的 AI 核心部分：双知识源 RAG、dispute detection、deadline reminders，以及群聊中的 AI 行为。
 
-This version replaces the older Qwen/DashScope plan. The backend AI scaffold is now built around **OpenAI + pgvector + SQLAlchemy AsyncEngine**, with a narrower MVP scope aimed at the Phase 1 prototype.
+这份文档是当前 `backend/` 目录下 AI Core MVP 脚手架的真实对齐版本，可以把它看成当前仓库里 AI 相关实现的“方案说明 + 同步记录”。
 
-**Current scope:**
-- Dual-source RAG over user policy PDFs (KB-A) and California/U.S. regulatory docs (KB-B)
-- Two-layer dispute detection
-- Passive deadline reminders based on stored claim dates
-- Group chat AI stages 1/2/3 with limited proactive behavior
-- Fixed disclaimer + inline source citations
+这版方案已经不再使用早期的 Qwen / DashScope 规划，而是收敛到：
 
-**Explicitly out of Phase 1 scope:**
-- Second-pass hallucination validator
-- Multi-provider model abstraction
-- DashScope / Qwen deployment logic
-- Production-grade CCPA retention matrix for logs/observability
-- Full evaluation harness beyond deterministic tests
+- `OpenAI`
+- `pgvector`
+- `SQLAlchemy AsyncEngine`
+
+并且范围明确收紧到课程项目 Phase 1 / MVP 原型。
+
+**当前范围：**
+
+- 对用户 policy PDF（KB-A）和 California / U.S. 法规资料（KB-B）做双知识源 RAG
+- 两层 dispute detection
+- 基于已存 claim dates 的被动 deadline reminder
+- Stage 1 / 2 / 3 群聊 AI 行为
+- 固定 disclaimer + inline citations
+- 第二主线的事故流程共享契约与报告 payload 中间层
+
+**明确不在当前 Phase 1 范围内的内容：**
+
+- 第二轮 hallucination validator
+- 多 AI provider 抽象层
+- DashScope / Qwen 相关部署逻辑
+- 生产级别的 CCPA retention / observability 方案
+- 大而全的 evaluation harness
 
 ---
 
-## Final Tech Stack
+## 最终技术栈
 
-| Component | Final Choice | Why |
+| 组件 | 当前选择 | 原因 |
 |---|---|---|
-| Primary LLM | `gpt-5.4-mini` with `xhigh` reasoning | Strong mini model for grounded QA and higher-effort answer synthesis |
-| Classification LLM | `gpt-5.4-mini` with `xhigh` reasoning | Reuses the same GPT-5.4 mini family for dispute classification consistency |
-| Embeddings | `text-embedding-3-large` at 1536 dimensions | Better retrieval quality while staying compatible with the current `pgvector(1536)` schema |
-| Vector store | PostgreSQL + `pgvector` | Clean relational integration and case-level isolation |
-| DB access | shared `SQLAlchemy AsyncEngine` | One pool, one driver, easier handoff with Ke Wu's FastAPI app |
-| Chunking | `tiktoken` | Simple token-aware chunking without extra framework overhead |
-| PDF parsing | `pdfplumber` + `pypdf` fallback | Handles tables and recovers text from simpler PDFs |
-| HTML parsing | `html2text` | Good enough for KB-B HTML sources |
-| Storage | AWS S3 | Policy PDFs and optional KB-B backups |
+| 主回答模型 | `gpt-5.4-mini` + `xhigh` reasoning | 适合 grounded QA 与较高强度的回答生成 |
+| 分类模型 | `gpt-5.4-mini` + `xhigh` reasoning | 与主模型保持一致，减少行为差异 |
+| Embeddings | `text-embedding-3-large`，按 1536 维写入 | 在保持较好检索质量的同时兼容当前 `pgvector(1536)` |
+| 向量库 | PostgreSQL + `pgvector` | 方便和关系型 case 数据并存 |
+| DB 接入 | 共享 `SQLAlchemy AsyncEngine` | 方便与 Ke 的 FastAPI app layer 对接 |
+| Chunking | `tiktoken` | 简单直接的 token-aware chunking |
+| PDF 解析 | `pdfplumber` + `pypdf` fallback | 兼顾表格和普通文本 |
+| HTML 解析 | `html2text` | 对 KB-B 的 HTML 资料已经够用 |
+| 存储 | AWS S3 | policy PDF 与可选 KB-B 备份 |
 
-**Final stack:** `openai` + `pgvector` + `sqlalchemy[asyncio]` + `tiktoken` + `pdfplumber` + `pypdf` + `html2text` + `boto3`
+**当前栈：**
+
+`openai` + `pgvector` + `sqlalchemy[asyncio]` + `tiktoken` + `pdfplumber` + `pypdf` + `html2text` + `boto3`
 
 ---
 
-## Current File Structure
+## 当前文件结构
 
 ```text
 backend/
@@ -50,11 +63,16 @@ backend/
 ├── main.py
 ├── models/
 │   ├── __init__.py
-│   └── ai_types.py
+│   ├── ai_types.py
+│   └── accident_types.py
 ├── ai/
 │   ├── __init__.py
 │   ├── clients.py
 │   ├── config.py
+│   │
+│   ├── accident/
+│   │   ├── __init__.py
+│   │   └── report_payload_builder.py
 │   │
 │   ├── ingestion/
 │   │   ├── __init__.py
@@ -65,6 +83,7 @@ backend/
 │   │   ├── embedder.py
 │   │   ├── vector_store.py
 │   │   ├── kb_b_loader.py
+│   │   ├── kb_b_catalog.py
 │   │   └── ingest_policy.py
 │   │
 │   ├── rag/
@@ -72,6 +91,10 @@ backend/
 │   │   ├── prompt_templates.py
 │   │   ├── citation_formatter.py
 │   │   └── query_engine.py
+│   │
+│   ├── policy/
+│   │   ├── __init__.py
+│   │   └── fact_extractor.py
 │   │
 │   ├── dispute/
 │   │   ├── __init__.py
@@ -90,17 +113,11 @@ backend/
 │       └── chat_ai_service.py
 │
 └── tests/
-    ├── test_stage_router.py
-    ├── test_keyword_filter.py
-    ├── test_deadline_checker.py
-    ├── test_mention_handler.py
-    ├── test_citation_formatter.py
-    └── test_chat_ai_service.py
 ```
 
 ---
 
-## Implemented Architecture
+## 当前已实现架构
 
 ```text
 Policy PDF / Regulatory HTML or PDF
@@ -120,33 +137,35 @@ Policy PDF / Regulatory HTML or PDF
    AnswerResponse with citations + disclaimer
 ```
 
-### Storage pattern
+### 存储模式
 
-- `vector_store.py` owns a module-level `async_sessionmaker`.
-- `init_engine(engine: AsyncEngine)` is called once at FastAPI startup.
-- `get_sessionmaker()` is the public accessor used by AI modules that need DB access outside ingestion.
-- `ensure_vector_schema(engine)` can be called during app startup or migration/bootstrap to create the `vector` extension and AI table.
-- Retrieval uses `pgvector.sqlalchemy.VECTOR(...)` plus `cosine_distance()` directly.
-- No `raw asyncpg`, no second pool, and no manual `CAST(:embedding AS vector)` SQL path.
+- `vector_store.py` 维护模块级别的 `async_sessionmaker`
+- `init_engine(engine: AsyncEngine)` 在 FastAPI 启动时初始化一次
+- `get_sessionmaker()` 给需要独立访问 DB 的 AI 模块使用
+- `ensure_vector_schema(engine)` 在启动或 bootstrap 阶段负责创建 `vector` extension 和 AI 表
+- 检索直接使用 `pgvector.sqlalchemy.VECTOR(...)` 和 `cosine_distance()`
+- 当前没有使用 `raw asyncpg`，也没有第二个连接池
 
-### Why shared `AsyncEngine` over raw `asyncpg`
+### 为什么选择共享 `AsyncEngine`，而不是单独 `asyncpg`
 
-For this project, shared `AsyncEngine` is the better default:
+对这个项目来说，共享 `AsyncEngine` 是更合理的默认方案：
 
-- Ke Wu's application layer will already use SQLAlchemy and psycopg.
-- A second asyncpg pool would increase connection management complexity for little MVP gain.
-- `pgvector-python` supports SQLAlchemy natively, including vector columns and cosine distance ordering.
-- One engine means easier startup wiring, fewer moving parts, and less coupling between app and AI modules.
+- Ke 的 app layer 后续本来也会用 SQLAlchemy + psycopg
+- 如果再额外起一个 asyncpg pool，会增加连接管理复杂度
+- `pgvector-python` 已经原生支持 SQLAlchemy
+- 一个 engine 更容易做统一启动、统一 handoff、统一资源管理
 
-Use `raw asyncpg` only if a future performance bottleneck is proven and localized to vector queries. Nothing in the current MVP requires that extra complexity.
+只有在未来真正证明向量查询成为性能瓶颈时，才有必要考虑更底层的专门通道。
 
 ---
 
-## Data Model
+## 数据模型
 
 ### `vector_documents`
 
-Current scaffold assumes the AI vector table below. The **recommended final integration target** is for `vector_documents.case_id` to match `cases.id` exactly and, if Ke Wu uses UUID primary keys, to become `UUID REFERENCES cases(id) ON DELETE CASCADE`. The current scaffold keeps `case_id` as a string placeholder only to avoid blocking the AI scaffold on Ke Wu's unfinished ORM/model layer.
+当前 AI scaffold 假定有如下向量表。推荐的最终目标是让 `vector_documents.case_id` 和 `cases.id` 保持完全一致；如果 Ke 最后使用 UUID 主键，则这里也应该最终改成 `UUID REFERENCES cases(id) ON DELETE CASCADE`。
+
+当前之所以还是字符串，是为了不让 AI scaffold 被 app ORM 层尚未完成这件事卡住。
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -167,11 +186,13 @@ CREATE TABLE vector_documents (
 CREATE INDEX ON vector_documents (source_type, case_id);
 ```
 
-**Phase 1 choice:** no ANN index yet. Expected chunk count is small enough that exact cosine ordering is acceptable and simpler.
+**当前 Phase 1 选择：**
 
-### `cases` additions
+暂时不做 ANN index。当前 chunk 数量不大，精确 cosine ordering 已经够用，而且更简单。
 
-The deadline module now assumes these fields exist on `cases`:
+### `cases` 需要新增的字段
+
+deadline module 当前默认依赖 `cases` 上有这些字段：
 
 ```sql
 ALTER TABLE cases
@@ -180,28 +201,55 @@ ADD COLUMN proof_of_claim_at TIMESTAMPTZ NULL,
 ADD COLUMN last_deadline_alert_at TIMESTAMPTZ NULL;
 ```
 
-**Meaning:**
-- `claim_notice_at`: when the claim notice/report was submitted or received
-- `proof_of_claim_at`: when the material needed for the insurer's 40-day decision clock was submitted
-- `last_deadline_alert_at`: cooldown to avoid spamming reminders more than once in 24 hours
+**语义：**
 
-### Deadline integration contract
+- `claim_notice_at`：claim notice / report 提交或被 insurer 收到的时间
+- `proof_of_claim_at`：触发 40 天 decision clock 的材料提交时间
+- `last_deadline_alert_at`：避免 24 小时内重复提醒的 cooldown 时间
 
-The AI module does **not** own a `Case` ORM model yet. `deadline_checker.py` currently uses raw SQL against `cases` intentionally so the AI scaffold can integrate before Ke Wu's shared ORM layer is finalized.
+### deadline integration contract
 
-That means the application layer must guarantee:
-- a real `cases` table exists
-- the three deadline columns above have been migrated
-- `id` is queryable with the `case_id` string passed into AI functions, or the integration layer adapts the AI boundary once the final `cases.id` type is fixed
-- case deletion flow clears case-linked S3 objects in addition to DB rows
+当前 AI module 还没有共享 `Case` ORM model。`deadline_checker.py` 故意先用原始 SQL 访问 `cases`，这样可以在 Ke 的 ORM layer 完成前先不阻塞 AI。
+
+这意味着 app layer 需要保证：
+
+- 真实的 `cases` 表存在
+- 上面的三个时间字段已经被迁移进去
+- 传给 AI 函数的 `case_id` 最终能够正确映射到 `cases.id`
+- case 删除时，除了清 DB 行，也要清理关联的 S3 / 文件对象
 
 ---
 
-## KB-B Regulatory Sources
+## 第二主线共享契约
 
-The MVP loader indexes these six documents:
+第二主线当前已经有共享技术骨架，但还没有接成完整产品流程。
 
-| ID | Document | URL | Format |
+当前已经存在：
+
+- `StageAAccidentIntake`
+- `StageBAccidentIntake`
+- `AccidentReportPayload`
+- `AccidentChatContext`
+- `build_accident_report_payload(...)`
+- `build_accident_chat_context(...)`
+
+设计目的：
+
+- 先把事故表单字段和事故报告中间层结构固定住
+- 让 Ke 后面可以围绕这些 schema 接 API / 存储 / PDF generator
+- 让 Lou 可以直接按共享字段做 Stage A / Stage B 表单与报告预览
+
+详细说明见：
+
+- `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
+
+---
+
+## KB-B 法规资料源
+
+当前 MVP loader 索引下面这 6 份资料：
+
+| ID | 文档 | URL | 格式 |
 |---|---|---|---|
 | `iso_pp_0001` | ISO Standard Auto Policy PP 00 01 | `https://doi.nv.gov/uploadedFiles/doinvgov/_public-documents/Consumers/PP_00_01_06_98.pdf` | PDF |
 | `naic_model_900` | NAIC Model 900 | `https://content.naic.org/sites/default/files/model-law-900.pdf` | PDF |
@@ -210,38 +258,41 @@ The MVP loader indexes these six documents:
 | `iii_nofault` | No-Fault vs At-Fault Reference | `https://www.iii.org/article/background-on-no-fault-auto-insurance` | HTML |
 | `naic_complaints` | NAIC Complaint Data | `https://content.naic.org/cis_agg_reason.htm` | HTML |
 
-Implementation notes:
-- `kb_b_loader.py` downloads and indexes them sequentially.
-- If S3 is configured, it also stores backup copies.
-- Policy ingestion requires S3; KB-B backup upload is optional.
+实现说明：
+
+- `kb_b_loader.py` 顺序下载并索引这些资料
+- 如果配置了 S3，也可以顺手备份
+- 当前本地仓库也支持直接从 `claimmate_rag_docs/` 做 KB-B 索引
 
 ---
 
-## Chunking Strategy
+## Chunking 策略
 
-**KB-A (policy PDF):**
-- `500` token chunks
+**KB-A（policy PDF）：**
+
+- `500` token chunk
 - `50` token overlap
-- section inferred from uppercase headings when possible
-- tables converted to markdown where available
-- metadata includes `case_id`, `page_num`, `section`
+- 如果可能，从大写标题推断 `section`
+- 表格尽量转成 markdown
+- metadata 包含 `case_id`、`page_num`、`section`
 
-**KB-B (regulatory docs):**
-- `250` token chunks
+**KB-B（regulatory docs）：**
+
+- `250` token chunk
 - `30` token overlap
-- section inferred from statute-like headings such as `§2695.5` or `§2695.7`
-- metadata includes `document_id`, `page_num`, `section`
+- 如果可能，从类似 `§2695.5` 的标题推断 `section`
+- metadata 包含 `document_id`、`page_num`、`section`
 
 ---
 
-## RAG Query Flow
+## RAG 查询流程
 
 ```text
 User question
     │
-    ├── embed question with text-embedding-3-large (1536 dimensions)
-    ├── search KB-A by case_id
-    └── search KB-B across shared regulatory corpus
+    ├── 用 text-embedding-3-large（1536 维）向量化问题
+    ├── 按 case_id 搜 KB-A
+    └── 在共享法规语料里搜 KB-B
              │
       build <policy_context> + <regulatory_context>
              │
@@ -252,64 +303,67 @@ User question
     return AnswerResponse + fixed disclaimer
 ```
 
-### Grounding rules
+### grounding 规则
 
-- Answers must come only from retrieved chunks.
-- If retrieval is empty or insufficient, the answer must say that information is not available.
-- Every factual sentence must carry `[S#]` inline references.
-- The final user-visible answer always ends with:
+- 回答只能来自检索到的 chunk
+- 如果检索结果为空或不足以支持回答，要明确说信息不足
+- 每个事实性句子都要带 `[S#]`
+- 用户最终看到的答案必须以固定 disclaimer 结尾：
 
 ```text
 Disclaimer: This is general information only and does not constitute legal or insurance advice. Consult a licensed professional for your specific situation.
 ```
 
-### Phase 1 simplification
+### 当前 Phase 1 简化
 
-There is **no** `response_validator.py` second-pass hallucination check in the current scaffold. Grounding is enforced through:
+当前 scaffold 没有 `response_validator.py` 这类 second-pass hallucination check。
 
-- prompt constraints
-- limited retrieved context
-- inline citation parsing
-- a conservative fallback when sources are thin
+现在的 grounding 主要靠：
+
+- prompt 限制
+- 收紧后的检索上下文
+- inline citation parser
+- source 不足时的保守 fallback
 
 ---
 
-## Prompt Design
+## Prompt 设计
 
 ### `SYSTEM_PROMPT_RAG`
 
-- Answer only from `<policy_context>` and `<regulatory_context>`
-- Say "not enough information" if the answer is not clearly supported
-- Add `[S#]` citations after factual statements
-- Never give legal advice or settlement recommendations
+- 只能根据 `<policy_context>` 和 `<regulatory_context>` 回答
+- 如果证据不够，就明确说 `not enough information`
+- 事实性内容后面加 `[S#]`
+- 不能给法律意见或 settlement recommendation
 
 ### `SYSTEM_PROMPT_DISPUTE`
 
-- Explain factual rights and next steps
-- Stay grounded in retrieved policy/regulatory text
-- Do not advise accepting or rejecting an offer
-- Keep tone neutral, especially in multi-party rooms
+- 解释事实性权利和 next steps
+- 必须 grounded 在 policy / regulation 文本里
+- 不替用户做 accept / reject 决定
+- 在多人房间里保持中性
 
-### Citation format
+### citation 格式
 
-The implemented parser expects inline references such as:
+当前实现要求模型输出这类 inline citation：
 
 ```text
 Your deductible is $500. [S1]
 California requires acknowledgment within 15 days. [S2]
 ```
 
-This is simpler to generate and easier to parse than free-form `[Source: ...]` strings.
+这个格式比自由文本的 `[Source: ...]` 更容易生成，也更容易解析。
 
 ---
 
 ## Dispute Detection
 
-### Layer 1: keyword filter
+### 第 1 层：keyword filter
 
-Implemented in `keyword_filter.py`.
+实现文件：`keyword_filter.py`
 
-**Hard triggers:**
+**硬触发词：**
+
 - `denied my claim`
 - `claim denied`
 - `bad faith`
@@ -318,7 +372,8 @@ Implemented in `keyword_filter.py`.
 - `wrong amount`
 - `rejection letter`
 
-**Soft triggers:**
+**软触发词：**
+
 - `disagree`
 - `too low`
 - `not fair`
@@ -326,55 +381,56 @@ Implemented in `keyword_filter.py`.
 - `delay`
 - `ignored`
 
-Soft triggers require at least 2 matches before escalating.
+软触发当前至少需要 2 个命中才升级。
 
-### Layer 2: semantic classifier
+### 第 2 层：semantic classifier
 
-Implemented in `semantic_detector.py`.
+实现文件：`semantic_detector.py`
 
-- Model: `gpt-5.4-nano`
-- Output format: JSON
-- Labels: `DENIAL | DELAY | AMOUNT | OTHER | NOT_DISPUTE`
+- 模型：`gpt-5.4-mini`
+- 输出格式：JSON
+- 标签：`DENIAL | DELAY | AMOUNT | OTHER | NOT_DISPUTE`
 
-Current statute mapping in code:
+当前代码里的法规映射：
+
 - `DENIAL` → `10 CCR §2695.7(b)`
-- `DELAY` → `10 CCR §2695.5(e) / §2695.7(c)`
+- `DELAY` → `10 CCR §2695.5(e)` / `§2695.7(c)`
 - `AMOUNT` → `10 CCR §2695.8`
 - `OTHER` → `10 CCR §2695`
 
-When a dispute is confirmed, the service routes to dispute-focused RAG over policy chunks plus a filtered set of regulatory documents.
+一旦 dispute 被确认，服务会切换到 dispute-focused RAG，使用 policy chunks 加筛过的法规资料一起回答。
 
 ---
 
 ## Deadline Tracker
 
-The old `activated_at` / Stripe-based deadline idea is no longer used.
+旧版基于 `activated_at` / Stripe 的 deadline 设计已经不再使用。
 
-### Current MVP model
+### 当前 MVP 模型
 
-- `claim_notice_at` drives the 15-day acknowledgment reminder
-- `proof_of_claim_at` drives the 40-day decision reminder
-- reminders are passive and informational only
-- reminders are rate-limited to once every 24 hours via `last_deadline_alert_at`
+- `claim_notice_at` 触发 15 天 acknowledgment reminder
+- `proof_of_claim_at` 触发 40 天 decision reminder
+- reminder 是被动的、信息型的
+- 通过 `last_deadline_alert_at` 做 24 小时冷却
 
-### California timing model used by the MVP
+### 当前使用的 California 时间模型
 
-- 15-day reminder from stored claim notice date
-- 40-day reminder from stored proof-of-claim date
+- claim notice date 后 15 天提醒
+- proof-of-claim date 后 40 天提醒
 
-The AI should **not** infer legal dates from chat text and should **not** make a strong legal conclusion if the stored dates may be incomplete.
+AI **不会**从聊天文本中自动推断法律日期，也**不会**在日期可能不完整时做强结论。
 
-### Current reminder style
+### 当前 reminder 风格
 
-The deadline reminder explicitly says it is based on saved case dates and tells the user to update those dates if they are incomplete.
+当前 deadline reminder 会明确说明：它是基于已保存的 case dates 生成的，如果日期不完整，用户需要先更新。
 
 ---
 
 ## Group Chat AI Stages
 
-### Stage routing
+### Stage 路由
 
-Implemented in `stage_router.py`.
+实现文件：`stage_router.py`
 
 ```python
 def determine_stage(participants: list[Participant], invite_sent: bool) -> ChatStage:
@@ -388,36 +444,37 @@ def determine_stage(participants: list[Participant], invite_sent: bool) -> ChatS
     return ChatStage.STAGE_1
 ```
 
-### Current behavior by stage
+### 当前各 Stage 行为
 
-| Stage | Condition | Behavior |
+| Stage | 条件 | 当前行为 |
 |---|---|---|
-| `STAGE_1` | Owner only | One proactive "policy indexed" summary, plus `@AI` answers |
-| `STAGE_2` | Owner only + invite sent | `@AI` answers and dispute/deadline responses, less unsolicited activity |
-| `STAGE_3` | Any external party present | Neutral tone, prefix replies with `For reference:` |
+| `STAGE_1` | 只有 owner | 一次性的 `policy indexed` proactive summary，加 `@AI` 问答 |
+| `STAGE_2` | 只有 owner，但 invite 已发 | `@AI` 问答 + dispute/deadline 响应，减少主动插话 |
+| `STAGE_3` | 有外部参与者加入 | 语气中性，回答前缀 `For reference:` |
 
 ### Mention handling
 
-Implemented in `mention_handler.py` and `chat_ai_service.py`.
+实现文件：`mention_handler.py` 和 `chat_ai_service.py`
 
-Behavior:
-1. Detect `@AI` or `@ai`
-2. Extract text after the mention
-3. If empty, ask the user to provide a question
-4. Run dispute detection first
-5. If dispute confirmed, run dispute-focused RAG
-6. Otherwise run standard policy question RAG
-7. In Stage 3, prefix output with `For reference:`
+行为：
 
-### Non-mention behavior
+1. 检测 `@AI` 或 `@ai`
+2. 提取 mention 之后的问题文本
+3. 如果文本为空，让用户补问题
+4. 先跑 dispute detection
+5. 如果 dispute confirmed，就走 dispute-focused RAG
+6. 否则走普通 policy question RAG
+7. 如果在 Stage 3，回答前加 `For reference:`
 
-If an event does not trigger a higher-priority proactive, mention, or dispute response, the fallback path is a deadline reminder if one is due.
+### 非 mention 行为
+
+如果一个事件没有触发更高优先级的 proactive / mention / dispute 响应，那么最后的 fallback 是 deadline reminder（如果当前到了该提醒的时间）。
 
 ---
 
-## Public Interfaces
+## 对外公共接口
 
-These are the public AI-core functions now exposed from `backend/ai/__init__.py`:
+下面这些 AI core 函数目前通过 `backend/ai/__init__.py` 暴露：
 
 ```python
 def init_engine(engine: AsyncEngine) -> None
@@ -431,11 +488,15 @@ async def on_claim_dates_updated(
 ) -> None
 ```
 
-### Shared types
+### 共享类型
 
-Shared types live in `backend/models/ai_types.py`.
+共享类型当前分两组：
 
-Important enums and dataclasses:
+- `backend/models/ai_types.py`
+- `backend/models/accident_types.py`
+
+`ai_types.py` 里的关键枚举和 dataclass：
+
 - `ChatStage`
 - `AITrigger`
 - `ChatEventTrigger`
@@ -445,21 +506,31 @@ Important enums and dataclasses:
 - `AIResponse`
 - `ChatEvent`
 
-`ChatEvent` still contains:
+`ChatEvent` 当前仍然包含：
+
 - `case_id`
 - `sender_role`
 - `message_text`
 - `participants`
 - `invite_sent`
 - `trigger`
-- optional `metadata`
-- optional `occurred_at`
+- 可选 `metadata`
+- 可选 `occurred_at`
+
+`accident_types.py` 里的关键类型：
+
+- `StageAAccidentIntake`
+- `StageBAccidentIntake`
+- `AccidentReportPayload`
+- `AccidentChatContext`
+- `PartyRecord`
+- `PhotoAttachment`
 
 ---
 
-## Environment Variables
+## 环境变量
 
-Current `AIConfig` shape:
+当前 `AIConfig` 的形状如下：
 
 ```python
 openai_api_key: str = ""
@@ -469,6 +540,8 @@ rag_reasoning_effort: str = "xhigh"
 classification_model: str = "gpt-5.4-mini"
 classification_reasoning_effort: str = "xhigh"
 embedding_model: str = "text-embedding-3-large"
+cors_allow_origins: str = ...
+cors_allow_origin_regex: str = ...
 database_url: str = ""
 
 aws_access_key_id: str = ""
@@ -488,13 +561,15 @@ deadline_alert_threshold_days: int = 5
 deadline_alert_cooldown_hours: int = 24
 ```
 
-See `backend/.env.example` for the current starter template.
+启动模板见：
+
+- `backend/.env.example`
 
 ---
 
-## Dependencies
+## 依赖
 
-Current backend dependencies:
+当前后端依赖包括：
 
 ```text
 fastapi
@@ -509,74 +584,84 @@ pypdf
 html2text
 boto3
 requests
+uvicorn
 pytest
 pytest-asyncio
 ```
 
-No LangChain, no LlamaIndex, no DashScope.
+当前没有使用：
+
+- LangChain
+- LlamaIndex
+- DashScope
 
 ---
 
-## Testing Status
+## 测试状态
 
-The current scaffold includes deterministic tests for:
+当前 scaffold 已经有确定性测试覆盖：
 
 - stage routing
 - dispute keyword filtering
 - deadline calculation
 - `@AI` mention extraction
-- citation parsing/fallback
+- citation parsing / fallback
 - chat service routing behavior
+- accident payload contract
+- main upload / ask API
 
-Current local verification:
+当前本地验证命令：
 
 ```bash
 cd backend
-.venv/bin/pytest -q
+./.venv/bin/pytest
 ```
 
-Expected result in the current scaffold:
+当前仓库最近一轮预期结果：
 
 ```text
-15 passed
+37 passed
 ```
 
 ---
 
-## Remaining Integration Tasks
+## 剩余集成任务
 
 ### Ke Wu / app integration
 
-- Wire `init_engine(engine)` into FastAPI startup
-- Decide final `cases.id` type and align `vector_documents.case_id` accordingly
-- Add `claim_notice_at`, `proof_of_claim_at`, `last_deadline_alert_at` to `cases`
-- Add routes/webhooks that call:
+- 把 `init_engine(engine)` 和完整 bootstrap 接进 FastAPI 启动
+- 决定最终 `cases.id` 类型，并和 `vector_documents.case_id` 对齐
+- 给 `cases` 加上 deadline 相关字段
+- 把第二主线的 `Stage A / Stage B / report` 数据流接成真实 API
+- 把：
   - `ingest_policy(...)`
   - `answer_policy_question(...)`
   - `handle_chat_event(...)`
   - `on_claim_dates_updated(...)`
-- Ensure case deletion also removes case-linked S3 policy/attachment objects
+  接到 app layer route / webhook / chat pipeline
+- case 删除时清理相关的 S3 / 本地文件对象
 
-### Mingtao next-step options
+### Mingtao 当前还能继续做什么
 
-- Add a live evaluation harness for policy Q&A
-- Add migration files instead of relying on `ensure_vector_schema()`
-- Add real integration tests against a local Postgres instance with `pgvector`
-- Tune prompts once real policy PDFs and live chats are available
-
----
-
-## Important Assumptions
-
-- OpenAI is the only AI provider in the current MVP scaffold.
-- Policy ingestion expects PDFs in S3.
-- KB-B backup upload is optional if S3 is not configured.
-- The current AI scaffold is intentionally decoupled from Ke Wu's unfinished ORM models, so some DB types may need alignment during integration.
-- Deadline reminders are informational and date-driven, not inferred from chat.
+- 增加 live evaluation harness
+- 从 `ensure_vector_schema()` 过渡到正式 migration 文件
+- 增加对本地 Postgres + `pgvector` 的集成测试
+- 在真实 policy / chat 数据稳定后进一步调 prompts
+- 在第二主线里继续补 API contract 和 report generator contract
 
 ---
 
-## References
+## 重要假设
+
+- 当前 MVP 只使用 OpenAI
+- policy ingestion 当前既支持 S3，也支持本地文件
+- KB-B 备份上传到 S3 是可选的
+- 当前 AI scaffold 有意和 Ke 尚未完成的 ORM layer 解耦，所以后面仍可能需要对齐类型
+- deadline reminder 是信息型的、基于日期字段的，不是从聊天自动推断的
+
+---
+
+## 参考资料
 
 - [OpenAI API Pricing](https://openai.com/api/pricing)
 - [OpenAI Embeddings Guide](https://platform.openai.com/docs/guides/embeddings)

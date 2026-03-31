@@ -1,37 +1,37 @@
-# Contributing
+# 协作说明
 
-This repository currently uses a simple branch-and-sync workflow without pull requests.
+这个仓库当前使用的是一个比较轻量的 `branch-and-sync` 协作方式，不走 PR 审批流，但依然要保持基本的同步纪律和人工 review。
 
-## Branch Naming
+## 分支命名
 
-Use short-lived personal branches so it is obvious who owns each task:
+每个人都应该使用短生命周期的个人分支，方便看出这项任务是谁在负责：
 
 - `mingtao/<task>`
 - `ke/<task>`
 - `lou/<task>`
 
-Examples:
+示例：
 
 - `mingtao/rag-policy-extraction`
 - `ke/chat-room-api`
 - `lou/intake-form-ui`
 
-## Team Ownership
+## 团队边界
 
-- Mingtao Ding: `backend/ai/`, RAG, embeddings, AI contracts, policy/dispute/deadline logic
-- Ke Wu: FastAPI integration, shared DB/app layer, auth, deployment, Stripe, chat backend
-- Yi-Hsien Lou: frontend UI, accident form flow, PDF/report UX, design handoff assets
+- Mingtao Ding：`backend/ai/`、RAG、embeddings、AI 契约、policy/dispute/deadline 逻辑
+- Ke Wu：FastAPI integration、共享 DB/app layer、deployment、chat backend、后续 app 产品层
+- Yi-Hsien Lou：前端 UI、事故表单流程、PDF/report UX、设计与展示交付
 
-## Recommended Workflow
+## 推荐工作流
 
-1. Sync your local `main`.
-2. Create a new branch for one focused task.
-3. Make the change and run the relevant local checks.
-4. Push your branch to GitHub so the team can see it and recover it if needed.
-5. Post a short update in the team chat before touching any high-coordination file.
-6. When the task is ready, sync `main`, merge your branch locally, rerun checks, and push `main`.
+1. 先同步本地 `main`
+2. 从 `main` 拉一条只做单一任务的分支
+3. 编写代码并运行相关本地检查
+4. 把分支 push 到 GitHub，方便团队查看和备份
+5. 如果要改高协调文件，先在群里发一句说明
+6. 任务完成后，再同步最新 `main`、本地 merge、重新跑检查，然后再 push `main`
 
-Example commands:
+示例命令：
 
 ```bash
 git checkout main
@@ -45,16 +45,16 @@ git merge mingtao/rag-query-routing
 git push origin main
 ```
 
-## Local Checks
+## 本地检查
 
-Backend work should run:
+后端相关改动至少要运行：
 
 ```bash
 cd backend
 ./.venv/bin/pytest
 ```
 
-If a local virtual environment does not exist yet:
+如果本地还没有虚拟环境：
 
 ```bash
 cd backend
@@ -63,39 +63,40 @@ python3 -m venv .venv
 ./.venv/bin/pytest
 ```
 
-GitHub Actions runs backend tests on every push, including task branches and `main`.
+GitHub Actions 当前会在每次 push 时运行后端测试，包括任务分支和 `main`。
 
-## Push Expectations
+## Push 前的基本要求
 
-- Keep each branch focused on one task
-- Explain what changed, why it changed, and how you tested it
-- Mention any contract changes affecting teammates
-- Update tests when behavior changes
-- Update `AGENTS.md` and `backend/.env.example` when new capabilities or environment variables are introduced
-- Do not merge stale work into `main`; pull `main` first and resolve conflicts locally
+- 一个分支只聚焦一类任务
+- 说明改了什么、为什么改、怎么验证的
+- 如果改动了共享契约，要明确告诉队友
+- 行为变化时要同步补测试
+- 新增能力或新环境变量时，要同步更新 `AGENTS.md` 和 `backend/.env.example`
+- 不要把过期的本地分支直接 merge 进 `main`；先 pull 最新 `main` 再解决冲突
 
-## High-Coordination Files
+## 高协调文件
 
-Coordinate before editing these files in parallel:
+下面这些文件如果要并行修改，最好先在群里对齐：
 
 - `backend/main.py`
 - `backend/models/ai_types.py`
+- `backend/models/accident_types.py`
 - `backend/.env.example`
-- shared database schema or migration files
-- any app-layer contract used by both AI modules and product routes
+- 共享数据库 schema / migration 文件
+- 同时被 AI 模块和产品路由使用的 app-layer contract
 
-## Review Guidance
+## 轻量 review 建议
 
-Even without PRs, the team should still do lightweight human review in chat or side-by-side before pushing shared changes to `main`:
+即使现在不用 PR，也建议在 push 共享改动到 `main` 前做一下轻量人工 review：
 
-- AI/core logic changes: check grounding, citations, and regression risk
-- API changes: check contract stability and deployment impact
-- UI changes: share screenshots or a short demo summary when possible
+- AI/core 逻辑改动：重点看 grounding、citation、回归风险
+- API 改动：重点看 contract 是否稳定、是否会影响联调
+- UI 改动：尽量附截图，或者至少发一段简短说明
 
-## Manual GitHub Settings To Prefer
+## GitHub 设置建议
 
-These settings are still best configured in the GitHub repository UI:
+这些设置仍然建议在 GitHub 仓库网页里手动保持：
 
-- Do not require pull requests if the team is intentionally using direct-sync collaboration
-- Keep force-push to `main` disabled
-- Keep `Backend CI` visible so teammates can confirm branch pushes are still passing
+- 如果团队明确采用 direct-sync 协作，就不要强制 PR
+- 不允许对 `main` 强制 push
+- 保留 `Backend CI` 可见，方便大家确认分支 push 后测试仍然通过
