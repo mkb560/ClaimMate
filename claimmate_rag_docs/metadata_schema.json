@@ -1,9 +1,0 @@
-{
-  "doc_id": "string",
-  "document_type": "policy | regulation | consumer_guide",
-  "source_name": "string",
-  "jurisdiction": "CA | US",
-  "section": "string",
-  "page": "number",
-  "title": "string"
-}

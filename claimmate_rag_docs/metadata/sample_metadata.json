@@ -1,0 +1,44 @@
+[
+  {
+    "doc_id": "ca_reg_2695_2",
+    "file_name": "ca_reg_2695_2_definitions.pdf",
+    "document_type": "regulation",
+    "source_name": "California Department of Insurance",
+    "jurisdiction": "CA",
+    "page": 1,
+    "section": "2695.2",
+    "section_root": "2695.2",
+    "title": "Definitions",
+    "coverage_category": "claims_handling",
+    "content_type": "definition",
+    "chunk_id": "ca_reg_2695_2_p1_full"
+  },
+  {
+    "doc_id": "policy_natgen_ca_02",
+    "file_name": "policy_sample_02_national_general_ca_personal_auto_policy.pdf",
+    "document_type": "policy",
+    "source_name": "National General",
+    "jurisdiction": "CA",
+    "page": 1,
+    "section": "policy_main",
+    "section_root": "policy_main",
+    "title": "California Personal Auto Policy",
+    "coverage_category": "general_policy",
+    "content_type": "coverage_clause",
+    "chunk_id": "policy_natgen_ca_02_p1_full"
+  },
+  {
+    "doc_id": "naic_auto_claims",
+    "file_name": "naic_consumer_guide_auto_claims.pdf",
+    "document_type": "consumer_guide",
+    "source_name": "NAIC",
+    "jurisdiction": "US",
+    "page": 1,
+    "section": "guide",
+    "section_root": "guide",
+    "title": "A Consumer's Guide to Auto Insurance Claims",
+    "coverage_category": "auto_claims",
+    "content_type": "guidance",
+    "chunk_id": "naic_auto_claims_p1_full"
+  }
+]
