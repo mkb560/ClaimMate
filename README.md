@@ -245,7 +245,6 @@ cd backend
 - 文档索引：`docs/README.md`
 - 详细 AI 方案：`docs/plan.md`
 - 第二主线契约：`docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
-- 上云策略：`docs/CLOUD_DEPLOYMENT_STRATEGY_ZH.md`
 - 本地 demo 运行：`docs/RUN_DEMO_ZH.md`
 - 远程共享后端：`docs/REMOTE_SHARED_BACKEND_ZH.md`
 - Ke handoff：`docs/KE_WU_HANDOFF_ZH.md`

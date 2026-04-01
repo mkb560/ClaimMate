@@ -15,8 +15,6 @@
 
 - `ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
   第二主线的共享技术契约。
-- `CLOUD_DEPLOYMENT_STRATEGY_ZH.md`
-  三个人的上云分工、阶段策略，以及当前哪些部分适合先上云。
 - `DEMO_PLAYBOOK_ZH.md`
   固定 demo 路径、问题顺序和展示重点。
 - `REMOTE_SHARED_BACKEND_ZH.md`
