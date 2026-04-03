@@ -9,8 +9,8 @@ This file gives coding agents the current source of truth for this repository.
 - The repository root also contains the curated `claimmate_rag_docs/` directory for local KB-B indexing.
 - The repository root also contains `demo_policy_pdfs/` with sample real policy PDFs for KB-A/demo use; keep these separate from `claimmate_rag_docs/` so they are not indexed as KB-B.
 - Project-facing Markdown docs now live under `docs/` except for this `AGENTS.md` file.
-- The FastAPI app currently exposes `/health` plus minimal demo upload/ask routes in `backend/main.py`.
-- Most product behavior currently exists as reusable AI modules plus tests, not as fully wired API endpoints.
+- The FastAPI app now includes routed health, policy upload/ask, case creation, accident workflow, claim-date, and chat-event endpoints.
+- The repository now contains both reusable AI modules and a lightweight app-layer integration under `backend/app/`.
 
 ## Product Context
 
@@ -41,7 +41,10 @@ backend/
 │   ├── ingestion/
 │   ├── policy/
 │   └── rag/
+├── app/
+│   └── routers/
 ├── models/
+│   ├── case_orm.py
 │   ├── accident_types.py
 │   └── ai_types.py
 └── tests/
@@ -50,12 +53,21 @@ backend/
 ### Implemented modules
 
 - `backend/main.py`
-  - FastAPI app with `/health`
-  - Minimal demo REST routes now include:
+  - FastAPI app assembly with lifespan bootstrap, CORS, and router includes
+  - Routed REST endpoints now include:
+    - `POST /cases` for case creation
     - `POST /cases/{case_id}/policy` for local policy PDF upload + KB-A indexing
     - `POST /cases/{case_id}/ask` for policy question answering with citations
-  - CORS now allows localhost-style frontend origins through both explicit origins and a localhost regex, which supports teammates calling a shared remote backend from their own local frontend dev servers
-  - Does **not** yet wire the full chat/dispute/deadline flows into REST routes or WebSocket handlers
+    - `PATCH /cases/{case_id}/accident/stage-a` for Stage A intake persistence
+    - `PATCH /cases/{case_id}/accident/stage-b` for Stage B intake persistence
+    - `POST /cases/{case_id}/accident/report` and `GET /cases/{case_id}/accident/report` for report payload generation and retrieval
+    - `PATCH /cases/{case_id}/claim-dates` for deadline-related case dates
+    - `POST /cases/{case_id}/chat/event` for app-layer invocation of `handle_chat_event(...)`
+  - CORS allows localhost-style frontend origins through both explicit origins and a localhost regex, which supports teammates calling a shared remote backend from their own local frontend dev servers
+
+- `backend/app/`
+  - Lightweight app-layer package for request validation, local file paths, policy upload handling, case persistence, response serialization, and FastAPI routers
+  - `routers/health.py`, `routers/policy_ask.py`, and `routers/cases_and_accident.py` hold the HTTP entry points instead of `main.py`
 
 - `backend/ai/config.py`
   - Centralized environment-based configuration using `pydantic-settings`
@@ -80,7 +92,7 @@ backend/
 
 - `backend/ai/runtime.py`
   - Creates the shared async SQLAlchemy engine from `DATABASE_URL`
-  - Bootstraps the `pgvector` schema and sessionmaker for local scripts or FastAPI startup
+  - Bootstraps the `pgvector` schema, sessionmaker, and app-layer `cases` table for local scripts or FastAPI startup
 
 - `backend/ai/rag/`
   - `query_engine.py`: dual-source retrieval over policy chunks and regulatory chunks
@@ -111,8 +123,12 @@ backend/
 - `backend/models/accident_types.py`
   - Shared dataclasses and enums for the two-stage accident intake flow, standardized accident report payloads, and chat-ready accident context
 
+- `backend/models/case_orm.py`
+  - Minimal SQLAlchemy ORM model for app-layer case persistence, cached accident/report payload JSON, and deadline-related timestamps
+
 - `backend/tests/`
-  - Deterministic tests for mention parsing, stage routing, deadline math, dispute keyword logic, citations, local KB-B source discovery, chat orchestration, and accident payload contracts
+  - Deterministic tests for mention parsing, stage routing, deadline math, dispute keyword logic, citations, local KB-B source discovery, chat orchestration, accident payload contracts, app-layer accident codec helpers, and route wiring
+  - Optional integration tests exercise case creation, accident/report persistence, and claim-date updates against a real Postgres + pgvector database
 
 - `backend/scripts/`
   - `index_local_kb_b.py`: indexes local files from `claimmate_rag_docs/` into PostgreSQL + `pgvector`
@@ -134,6 +150,16 @@ backend/
 - All final answers append a fixed disclaimer
 - Demo app uploads local PDFs into `backend/.local_data/policies/<case_id>/` before indexing them into KB-A
 - For short-term remote collaboration, teammates can call one shared backend over a public tunnel instead of each running their own local RAG stack
+
+### App-layer routes
+
+- `POST /cases` creates a case row, either with a caller-provided `case_id` or a generated `case-...` ID
+- `POST /cases/{case_id}/policy` and `POST /cases/{case_id}/ask` now call `ensure_case(...)`, so pure RAG/demo flows do not require explicit case creation first
+- `PATCH /cases/{case_id}/accident/stage-a` and `PATCH /cases/{case_id}/accident/stage-b` deep-merge frontend JSON into stored intake state
+- `POST /cases/{case_id}/accident/report` materializes the deterministic accident report payload and cached chat context into the `cases` row
+- `GET /cases/{case_id}/accident/report` returns the stored report/chat context and reports a 404 if a report has not been generated yet
+- `PATCH /cases/{case_id}/claim-dates` updates deadline fields and clears `last_deadline_alert_at`
+- `POST /cases/{case_id}/chat/event` maps the request into `models.ai_types.ChatEvent` and returns either serialized AI output or `null`
 
 ### Chat AI
 
@@ -170,10 +196,11 @@ backend/
 - `backend/ai/ingestion/vector_store.py` requires `init_engine(engine)` to be called before any DB-backed vector or deadline operations
 - `ensure_vector_schema(engine)` should be run during bootstrap/migration setup
 - `backend/ai/runtime.py` now provides `create_ai_engine()` and `bootstrap_vector_store(engine)` for this setup
+- `bootstrap_vector_store(engine)` also runs `CaseBase.metadata.create_all(...)`, so the lightweight `cases` table is created automatically in local/dev environments
 
 ### Required `cases` fields
 
-The AI deadline module assumes the application layer provides these columns on `cases`:
+The AI deadline module assumes the application layer provides these columns on `cases`, and the current app-layer ORM now creates them in local/dev bootstrap:
 
 - `claim_notice_at TIMESTAMPTZ NULL`
 - `proof_of_claim_at TIMESTAMPTZ NULL`
@@ -190,9 +217,7 @@ The AI deadline module assumes the application layer provides these columns on `
 Do **not** assume the following already exist in this repo:
 
 - full authentication flows
-- case CRUD routes
-- accident intake API routes
-- chat REST API
+- full case CRUD beyond the current create + accident/report + claim-date hooks
 - WebSocket room management
 - Stripe checkout or webhook handling
 - invite-link issuance/validation
@@ -250,6 +275,7 @@ Use `backend/.env.example` as the template. Current variables:
 
 - Running `pytest` outside the project virtual environment may fail if required packages such as `pgvector` are not installed in the active interpreter
 - In this repo, `./.venv/bin/pytest` is the reliable command
+- Real-DB integration tests can be run with `DATABASE_URL=... ./.venv/bin/pytest -m integration`
 - Local KB-B indexing requires both a working `DATABASE_URL` and an `OPENAI_API_KEY` with available quota
 - The local demo/eval suite can be run with `DATABASE_URL=... OPENAI_API_KEY=... ./.venv/bin/python scripts/run_demo_eval.py`
 - A short-term remote sharing workflow is documented in `docs/REMOTE_SHARED_BACKEND_ZH.md`, and `backend/scripts/run_shared_backend.sh` can be used to expose the local backend through ngrok for teammates

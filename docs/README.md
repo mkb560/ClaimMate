@@ -4,6 +4,8 @@
 
 ## 核心文档
 
+- `PROJECT_PROGRESS_AND_STRUCTURE.md`
+  基于根目录 README 整理的**当前进度**、**待办方向**与**仓库结构**（含最新后端 API 与应用层说明）。
 - `plan.md`
   当前 AI Core MVP 方案文档，已经按当前仓库真实实现同步。
 - `CONTRIBUTING.md`

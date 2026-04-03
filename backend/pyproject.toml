@@ -31,9 +31,24 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["ai", "ai.accident", "ai.chat", "ai.deadline", "ai.dispute", "ai.ingestion", "ai.policy", "ai.rag", "models"]
+packages = [
+    "ai",
+    "ai.accident",
+    "ai.chat",
+    "ai.deadline",
+    "ai.dispute",
+    "ai.ingestion",
+    "ai.policy",
+    "ai.rag",
+    "app",
+    "app.routers",
+    "models",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "integration: hits a real DATABASE_URL (Postgres + pgvector); set DATABASE_URL in .env or env",
+]

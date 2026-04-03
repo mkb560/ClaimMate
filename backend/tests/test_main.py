@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
@@ -23,14 +24,15 @@ def _build_client(monkeypatch, tmp_path: Path) -> TestClient:
 
     monkeypatch.setattr(main.ai_config, "database_url", "postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate")
     monkeypatch.setattr(main.ai_config, "openai_api_key", "test-key")
-    monkeypatch.setattr(main, "LOCAL_POLICY_STORAGE_ROOT", tmp_path)
+    monkeypatch.setattr("app.paths.LOCAL_POLICY_STORAGE_ROOT", tmp_path)
+    monkeypatch.setattr("app.case_service.ensure_case", AsyncMock(return_value=None))
     monkeypatch.setattr(main, "create_ai_engine", lambda: _DummyEngine())
     monkeypatch.setattr(main, "bootstrap_vector_store", fake_bootstrap)
     return TestClient(main.app)
 
 
 def test_upload_policy_endpoint_indexes_pdf(monkeypatch, tmp_path: Path) -> None:
-    import main
+    from app.routers import policy_ask
 
     captured: dict[str, object] = {}
 
@@ -39,7 +41,7 @@ def test_upload_policy_endpoint_indexes_pdf(monkeypatch, tmp_path: Path) -> None
         captured["case_id"] = case_id
         return 7
 
-    monkeypatch.setattr(main, "ingest_local_policy_file", fake_ingest_local_policy_file)
+    monkeypatch.setattr(policy_ask, "ingest_local_policy_file", fake_ingest_local_policy_file)
 
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.post(
@@ -62,7 +64,7 @@ def test_upload_policy_endpoint_indexes_pdf(monkeypatch, tmp_path: Path) -> None
 
 
 def test_ask_endpoint_returns_answer_and_citations(monkeypatch, tmp_path: Path) -> None:
-    import main
+    from app.routers import policy_ask
 
     async def fake_answer_policy_question(case_id: str, question: str) -> AnswerResponse:
         assert case_id == "demo-case"
@@ -82,7 +84,7 @@ def test_ask_endpoint_returns_answer_and_citations(monkeypatch, tmp_path: Path) 
             disclaimer="Disclaimer: demo",
         )
 
-    monkeypatch.setattr(main, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(policy_ask, "answer_policy_question", fake_answer_policy_question)
 
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.post(
