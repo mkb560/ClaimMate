@@ -13,6 +13,7 @@ backend/.local_data/
 .env.local
 backend/.env
 backend/.env.local
+frontend/.env.local
 *.log
 .claude/
 ~$*
