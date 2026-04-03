@@ -7,6 +7,8 @@ ClaimMate 是一个面向车主的 AI 理赔助手原型项目。它的目标不
 - 支持上传真实 policy PDF
 - 支持基于保单和法规做双知识源 RAG 问答
 - 支持返回 grounded answer + citations
+- 支持 `cases` 持久化、事故双阶段 intake、报告 JSON 生成
+- 支持 claim dates 更新和 chat-event 入口调用 AI orchestration
 - 支持本地 `pgvector` 向量检索
 - 支持通过临时公网地址把你本机后端共享给远程队友联调
 
@@ -20,7 +22,7 @@ ClaimMate 的完整产品故事有三条主线：
 2. 两阶段事故信息收集与报告生成
 3. 后续理赔群聊中的 AI 支持
 
-当前仓库里，第一条主线已经最完整；第二条主线目前已经有共享数据契约和报告 payload builder；第三条主线的 AI 逻辑模块已经存在，但完整的群聊产品层还没有完全接起来。
+当前仓库里，第一条主线已经最完整；第二条主线已经不只是 contract，而是连同 app-layer API 和本地持久化一起接上了；第三条主线的 AI 逻辑模块和 HTTP 入口已经存在，但完整的群聊产品层还没有完全接起来。
 
 ## 当前已经实现了什么
 
@@ -41,7 +43,7 @@ ClaimMate 的完整产品故事有三条主线：
 - `backend/ai/rag/`
 - `backend/ai/policy/`
 
-### 2. 第二主线技术骨架
+### 2. 第二主线：契约 + API + 报告中间层
 
 事故流程的共享技术契约已经先落地，包括：
 
@@ -55,18 +57,45 @@ ClaimMate 的完整产品故事有三条主线：
 
 - `backend/models/accident_types.py`
 - `backend/ai/accident/report_payload_builder.py`
+- `backend/app/accident_codec.py`
+- `backend/app/case_service.py`
+- `backend/app/routers/cases_and_accident.py`
 
-这部分的目标是先把字段和中间层结构定死，方便后面 Ke 接 API / 存储、Lou 接前端表单和报告预览。
+当前已经能做的不是只有“定 schema”，还包括：
 
-### 3. 最小后端 API
+- `POST /cases`
+- `PATCH /cases/{case_id}/accident/stage-a`
+- `PATCH /cases/{case_id}/accident/stage-b`
+- `POST /cases/{case_id}/accident/report`
+- `GET /cases/{case_id}/accident/report`
 
-当前 FastAPI 已经提供：
+现在后端可以把 Stage A / Stage B JSON 存进 `cases` 表，并生成事故报告 payload 与 chat context 的 JSON 结果，方便 Lou 直接接表单和报告预览。
+
+### 3. 当前后端 API
+
+当前 FastAPI 已经不只是最小 demo 路由，而是包含一层轻量 app-layer：
 
 - `GET /health`
+
+RAG / demo 主路径：
+
 - `POST /cases/{case_id}/policy`
 - `POST /cases/{case_id}/ask`
 
-也就是说，前端现在已经可以围绕“上传保单 + 提问 + 展示 AI 回答”这条 demo 路直接联调。
+事故与 case：
+
+- `POST /cases`
+- `PATCH /cases/{case_id}/accident/stage-a`
+- `PATCH /cases/{case_id}/accident/stage-b`
+- `POST /cases/{case_id}/accident/report`
+- `GET /cases/{case_id}/accident/report`
+- `PATCH /cases/{case_id}/claim-dates`
+
+聊天 AI 入口：
+
+- `POST /cases/{case_id}/chat/event`
+
+也就是说，前端现在不仅可以围绕“上传保单 + 提问 + 展示 AI 回答”这条 demo 路联调，也可以开始对接事故流程、报告预览、claim date 更新和 chat-event 触发。
 
 ### 4. 远程共享后端
 
@@ -89,12 +118,13 @@ ClaimMate 的完整产品故事有三条主线：
 - invite link 免注册加入房间
 - payment / Stripe
 - 完整部署体系
-- 完整 case CRUD 和正式数据库迁移
+- 完整 case CRUD、正式数据库迁移和长期 schema 演进
 
 所以请把当前项目理解成：
 
 - 已经可运行的 AI 后端原型
 - 已经可 demo 的 upload + ask 链路
+- 已经有 app-layer 的 case / accident / claim-dates / chat-event 接口骨架
 - 正在继续往完整产品故事靠拢
 
 ## 仓库结构
@@ -115,6 +145,7 @@ ClaimMate/
 
 - `main.py`：FastAPI 入口
 - `ai/`：AI 核心逻辑
+- `app/`：应用层路由、case service、请求校验、本地文件路径
 - `models/`：共享数据结构
 - `tests/`：自动化测试
 - `scripts/`：本地索引、查询、demo、共享后端脚本
@@ -203,6 +234,36 @@ curl -X POST "http://127.0.0.1:8000/cases/demo-case/ask" \
 
 - `docs/RUN_DEMO_ZH.md`
 
+### 7. 创建 case、写入事故信息、生成报告
+
+```bash
+curl -X POST "http://127.0.0.1:8000/cases" \
+  -H "Content-Type: application/json" \
+  -d '{"case_id":"demo-case"}'
+
+curl -X PATCH "http://127.0.0.1:8000/cases/demo-case/accident/stage-a" \
+  -H "Content-Type: application/json" \
+  -d '{"quick_summary":"Rear-end collision at a red light.","police_called":true}'
+
+curl -X PATCH "http://127.0.0.1:8000/cases/demo-case/accident/stage-b" \
+  -H "Content-Type: application/json" \
+  -d '{"detailed_narrative":"Stopped at a light and got hit from behind.","damage_summary":"Rear bumper damage."}'
+
+curl -X POST "http://127.0.0.1:8000/cases/demo-case/accident/report"
+```
+
+### 8. 更新 claim dates 和触发 chat event
+
+```bash
+curl -X PATCH "http://127.0.0.1:8000/cases/demo-case/claim-dates" \
+  -H "Content-Type: application/json" \
+  -d '{"claim_notice_at":"2026-04-01T10:00:00Z","proof_of_claim_at":"2026-04-03T10:00:00Z"}'
+
+curl -X POST "http://127.0.0.1:8000/cases/demo-case/chat/event" \
+  -H "Content-Type: application/json" \
+  -d '{"sender_role":"owner","message_text":"@AI what does my policy say about rental reimbursement?","participants":[{"user_id":"u1","role":"owner"}],"invite_sent":false,"trigger":"message","metadata":{}}'
+```
+
 ## 共享给远程队友
 
 如果 Ke 和 Lou 不想自己本地起 RAG，可以直接连你这台机器的后端。
@@ -228,10 +289,11 @@ cd backend
 ./.venv/bin/pytest
 ```
 
-当前仓库最近一次回归状态已经到：
+如果你本地已经配好真实 `DATABASE_URL`，还可以跑集成测试：
 
-```text
-37 passed
+```bash
+cd backend
+DATABASE_URL=postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate ./.venv/bin/pytest -m integration
 ```
 
 ## 团队分工
