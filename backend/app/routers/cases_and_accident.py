@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from ai.chat.chat_ai_service import handle_chat_event
 from app.case_validation import validate_case_id
 from app.chat_serialize import ai_response_to_dict
+from app.demo_case_service import seed_demo_accident_case
 from app.deps import ensure_ai_ready, ensure_db_ready
 from app import case_service
 from models.ai_types import ChatEvent, ChatEventTrigger, Participant
@@ -61,6 +62,13 @@ async def get_case_snapshot(case_id: str, request: Request) -> dict[str, object]
     if row is None:
         raise HTTPException(status_code=404, detail="Case not found.")
     return case_service.serialize_case_snapshot(row)
+
+
+@router.post("/cases/{case_id}/demo/seed-accident")
+async def seed_accident_demo_case(case_id: str, request: Request) -> dict[str, object]:
+    ensure_db_ready(request)
+    normalized = validate_case_id(case_id)
+    return await seed_demo_accident_case(normalized)
 
 
 @router.patch("/cases/{case_id}/accident/stage-a")

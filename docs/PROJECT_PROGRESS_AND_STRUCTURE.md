@@ -51,6 +51,7 @@
 - **事故流程 API**  
   - `POST /cases`  
   - `GET /cases/{case_id}`  
+  - `POST /cases/{case_id}/demo/seed-accident`  
   - `PATCH /cases/{case_id}/accident/stage-a`  
   - `PATCH /cases/{case_id}/accident/stage-b`  
   - `POST /cases/{case_id}/accident/report`  

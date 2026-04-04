@@ -66,6 +66,7 @@ ClaimMate 的完整产品故事有三条主线：
 
 - `POST /cases`
 - `GET /cases/{case_id}`
+- `POST /cases/{case_id}/demo/seed-accident`
 - `PATCH /cases/{case_id}/accident/stage-a`
 - `PATCH /cases/{case_id}/accident/stage-b`
 - `POST /cases/{case_id}/accident/report`
@@ -88,6 +89,7 @@ RAG / demo 主路径：
 
 - `POST /cases`
 - `GET /cases/{case_id}`
+- `POST /cases/{case_id}/demo/seed-accident`
 - `PATCH /cases/{case_id}/accident/stage-a`
 - `PATCH /cases/{case_id}/accident/stage-b`
 - `POST /cases/{case_id}/accident/report`
@@ -111,6 +113,7 @@ RAG / demo 主路径：
 
 - `/health`
 - policy upload + ask
+- seeded accident demo case
 - `GET /cases/{case_id}` snapshot 读取
 - accident report JSON preview
 - stage 3 chat event response + citations

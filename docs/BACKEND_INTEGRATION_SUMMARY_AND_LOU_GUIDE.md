@@ -50,6 +50,7 @@ Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/a
 | ------- | ----------------------------------- | -------------------------------------------------------------------------------- |
 | `POST`  | `/cases`                            | Create a case; optional body `{"case_id": "my-id"}` or server-generated `case-…` |
 | `GET`   | `/cases/{case_id}`                  | Read the current case snapshot: claim dates, Stage A/B JSON, report/chat caches |
+| `POST`  | `/cases/{case_id}/demo/seed-accident` | Seed the built-in accident/chat demo payloads for a given case id               |
 | `PATCH` | `/cases/{case_id}/accident/stage-a` | Merge JSON into Stage A intake                                                   |
 | `PATCH` | `/cases/{case_id}/accident/stage-b` | Merge JSON into Stage B intake                                                   |
 | `POST`  | `/cases/{case_id}/accident/report`  | Build report via `report_payload_builder`, store payload + chat context          |
@@ -104,11 +105,12 @@ Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/a
 ### 5. Suggested UX order
 
 1. `**POST /cases`** (optional if you only use RAG with a known `case_id` string).
-2. `**GET /cases/{case_id}`** whenever the page loads or refreshes, so the UI can rehydrate saved state instead of assuming a blank form.
-3. Stage A form → `**PATCH .../accident/stage-a**`
-4. Stage B form → `**PATCH .../accident/stage-b**`
-5. `**POST .../accident/report**` then `**GET .../accident/report**` for preview / pinned summary data.
-6. Claim dates when the user has them → `**PATCH .../claim-dates**` (ISO-8601 datetimes).
+2. For demo mode, you can directly call `**POST /cases/{case_id}/demo/seed-accident**` to prepare a stable seeded case.
+3. `**GET /cases/{case_id}`** whenever the page loads or refreshes, so the UI can rehydrate saved state instead of assuming a blank form.
+4. Stage A form → `**PATCH .../accident/stage-a**`
+5. Stage B form → `**PATCH .../accident/stage-b**`
+6. `**POST .../accident/report**` then `**GET .../accident/report**` for preview / pinned summary data.
+7. Claim dates when the user has them → `**PATCH .../claim-dates**` (ISO-8601 datetimes).
 
 ### 6. Errors worth handling in UI
 

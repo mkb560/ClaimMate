@@ -15,6 +15,7 @@
 
 - `POST /cases`
 - `GET /cases/{case_id}`
+- `POST /cases/{case_id}/demo/seed-accident`
 - `POST /cases/{case_id}/accident/report`
 - `POST /cases/{case_id}/chat/event`
 
@@ -35,10 +36,11 @@
 事故 / chat demo 的最短路径：
 
 1. 用固定 `case_id`：`demo-accident-2026-04`
-2. 先 `GET /cases/{case_id}` 读取当前 snapshot
-3. 如果要刷新报告，调用 `POST /cases/{case_id}/accident/report`
-4. 再次 `GET /cases/{case_id}`，拿新的 `report_payload` / `chat_context`
-5. 用 `POST /cases/{case_id}/chat/event` 展示 AI chat response
+2. 先 `POST /cases/{case_id}/demo/seed-accident`
+3. 再 `GET /cases/{case_id}` 读取当前 snapshot
+4. 如果要刷新报告，调用 `POST /cases/{case_id}/accident/report`
+5. 再次 `GET /cases/{case_id}`，拿新的 `report_payload` / `chat_context`
+6. 用 `POST /cases/{case_id}/chat/event` 展示 AI chat response
 
 ## 1. 上传 policy PDF
 
@@ -330,6 +332,23 @@ export async function getCaseSnapshot(caseId: string) {
   if (!response.ok) {
     const error = await response.json().catch(() => null)
     throw new Error(error?.detail || "Load case snapshot failed")
+  }
+
+  return response.json()
+}
+```
+
+### 一键 seed 固定事故 demo case
+
+```ts
+export async function seedAccidentDemoCase(caseId: string) {
+  const response = await fetch(`/cases/${caseId}/demo/seed-accident`, {
+    method: "POST",
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || "Seed accident demo failed")
   }
 
   return response.json()

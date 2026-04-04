@@ -57,6 +57,7 @@ backend/
   - Routed REST endpoints now include:
     - `POST /cases` for case creation
     - `GET /cases/{case_id}` for reading the current case snapshot, including accident JSON and cached report/chat payloads
+    - `POST /cases/{case_id}/demo/seed-accident` for seeding the fixed accident/chat demo payloads into a chosen case id
     - `POST /cases/{case_id}/policy` for local policy PDF upload + KB-A indexing
     - `POST /cases/{case_id}/ask` for policy question answering with citations
     - `PATCH /cases/{case_id}/accident/stage-a` for Stage A intake persistence
@@ -163,6 +164,7 @@ backend/
 
 - `POST /cases` creates a case row, either with a caller-provided `case_id` or a generated `case-...` ID
 - `GET /cases/{case_id}` returns the current app-layer snapshot: claim dates, stored Stage A/B JSON, and cached report/chat payloads when present
+- `POST /cases/{case_id}/demo/seed-accident` populates a stable accident demo case and returns seeded snapshot/report/chat sample data for frontend/demo use
 - `POST /cases/{case_id}/policy` and `POST /cases/{case_id}/ask` now call `ensure_case(...)`, so pure RAG/demo flows do not require explicit case creation first
 - `PATCH /cases/{case_id}/accident/stage-a` and `PATCH /cases/{case_id}/accident/stage-b` deep-merge frontend JSON into stored intake state
 - `POST /cases/{case_id}/accident/report` materializes the deterministic accident report payload and cached chat context into the `cases` row

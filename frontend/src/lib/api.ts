@@ -107,6 +107,23 @@ export type ChatEventResponse = {
   response: AIResponsePayload | null;
 };
 
+export type SeedAccidentDemoResponse = {
+  case_id: string;
+  kb_b_status: string;
+  stage_a: Record<string, unknown>;
+  stage_b: Record<string, unknown>;
+  claim_dates: {
+    claim_notice_at: string | null;
+    proof_of_claim_at: string | null;
+  };
+  report_payload: AccidentReportPayload;
+  chat_context: AccidentChatContext;
+  sample_chat_requests: Record<string, unknown>;
+  sample_chat_responses: Record<string, AIResponsePayload | null>;
+  sample_chat_errors: Record<string, string>;
+  case_snapshot: CaseSnapshotResponse | null;
+};
+
 export async function checkHealth() {
   const response = await fetch(`${API_BASE_URL}/health`, {
     method: "GET",
@@ -210,4 +227,20 @@ export async function sendChatEvent(caseId: string, payload: ChatEventRequest) {
   }
 
   return (await response.json()) as ChatEventResponse;
+}
+
+export async function seedAccidentDemoCase(caseId: string) {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/demo/seed-accident`, {
+    method: "POST",
+    headers: {
+      ...NGROK_HEADERS,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Seed accident demo failed");
+  }
+
+  return (await response.json()) as SeedAccidentDemoResponse;
 }

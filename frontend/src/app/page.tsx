@@ -14,6 +14,7 @@ import {
   AccidentReportPayload,
   AccidentChatContext,
   sendChatEvent,
+  seedAccidentDemoCase,
   uploadPolicy,
 } from "@/lib/api";
 
@@ -134,6 +135,7 @@ export default function HomePage() {
   const [loadingSnapshot, setLoadingSnapshot] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
+  const [loadingSeed, setLoadingSeed] = useState(false);
 
   const [error, setError] = useState("");
 
@@ -208,6 +210,32 @@ export default function HomePage() {
       setError(err instanceof Error ? err.message : "Load snapshot failed");
     } finally {
       setLoadingSnapshot(false);
+    }
+  }
+
+  async function handleSeedAccidentDemo() {
+    setLoadingSeed(true);
+    setError("");
+    try {
+      const result = await seedAccidentDemoCase(accidentCaseId.trim());
+      setCaseSnapshot(result.case_snapshot);
+      setReportResult({
+        report_payload: result.report_payload,
+        chat_context: result.chat_context,
+      });
+      const seededStage3Response = result.sample_chat_responses.claim_rule_stage_3;
+      setChatResult(
+        seededStage3Response
+          ? {
+              case_id: result.case_id,
+              response: seededStage3Response,
+            }
+          : null
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Seed accident demo failed");
+    } finally {
+      setLoadingSeed(false);
     }
   }
 
@@ -356,6 +384,13 @@ export default function HomePage() {
             />
 
             <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleSeedAccidentDemo}
+                disabled={loadingSeed}
+                className="rounded-xl border px-4 py-2"
+              >
+                {loadingSeed ? "Seeding..." : "Seed accident demo case"}
+              </button>
               <button
                 onClick={handleLoadSnapshot}
                 disabled={loadingSnapshot}

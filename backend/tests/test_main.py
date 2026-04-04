@@ -181,6 +181,42 @@ def test_get_case_snapshot_returns_404_for_missing_case(monkeypatch, tmp_path: P
     assert response.json() == {"detail": "Case not found."}
 
 
+def test_seed_accident_demo_endpoint_returns_seeded_payload(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    async def fake_seed_demo_accident_case(case_id: str):
+        assert case_id == "demo-accident-2026-04"
+        return {
+            "case_id": case_id,
+            "kb_b_status": "existing",
+            "stage_a": {"quick_summary": "Rear-end collision."},
+            "stage_b": {"damage_summary": "Rear bumper damage."},
+            "claim_dates": {"claim_notice_at": "2026-03-21T12:00:00Z"},
+            "report_payload": {"case_id": case_id, "report_title": "ClaimMate Accident Report - demo-accident-2026-04"},
+            "chat_context": {"case_id": case_id, "pinned_document_title": "ClaimMate Accident Report - demo-accident-2026-04"},
+            "sample_chat_requests": {},
+            "sample_chat_responses": {
+                "claim_rule_stage_3": {
+                    "text": "For reference: demo",
+                    "citations": [],
+                    "trigger": "MENTION",
+                    "metadata": {"stage": "stage_3"},
+                }
+            },
+            "sample_chat_errors": {},
+            "case_snapshot": {"case_id": case_id},
+        }
+
+    monkeypatch.setattr(cases_and_accident, "seed_demo_accident_case", fake_seed_demo_accident_case)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post("/cases/demo-accident-2026-04/demo/seed-accident")
+
+    assert response.status_code == 200
+    assert response.json()["case_id"] == "demo-accident-2026-04"
+    assert response.json()["sample_chat_responses"]["claim_rule_stage_3"]["trigger"] == "MENTION"
+
+
 def test_cors_headers_allow_local_frontend_origin(monkeypatch, tmp_path: Path) -> None:
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.options(

@@ -15,6 +15,10 @@
 
 - [seed_accident_demo.py](/Users/dingmingtao/Desktop/USC/研二下/DSCI560/ClaimMate/backend/scripts/seed_accident_demo.py)
 
+同时也有一个可直接给前端或远程共享后端调用的 route：
+
+- `POST /cases/{case_id}/demo/seed-accident`
+
 以及一份共享 demo data source：
 
 - [demo_seed_data.py](/Users/dingmingtao/Desktop/USC/研二下/DSCI560/ClaimMate/backend/app/demo_seed_data.py)
@@ -48,6 +52,14 @@ backend/.local_data/demo_cases/demo-accident-2026-04/
 ```
 
 如果本地 KB-B 还没建好，脚本会尝试自动把仓库根目录 `claimmate_rag_docs/` 建成 KB-B。
+
+如果你是在共享后端或前端 demo 页面里联调，不想先跑脚本，也可以直接调用：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/cases/demo-accident-2026-04/demo/seed-accident"
+```
+
+它会直接返回当前 seeded snapshot、report payload、chat context，以及 sample chat request/response 数据。
 
 说明：
 
