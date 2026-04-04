@@ -9,6 +9,7 @@ ClaimMate 是一个面向车主的 AI 理赔助手原型项目。它的目标不
 - 支持返回 grounded answer + citations
 - 支持 `cases` 持久化、事故双阶段 intake、报告 JSON 生成
 - 支持 claim dates 更新和 chat-event 入口调用 AI orchestration
+- 支持一个最小 Next.js demo UI 去演示 policy Q&A、事故 snapshot、报告预览和 chat response
 - 支持本地 `pgvector` 向量检索
 - 支持通过临时公网地址把你本机后端共享给远程队友联调
 
@@ -99,7 +100,22 @@ RAG / demo 主路径：
 
 也就是说，前端现在不仅可以围绕“上传保单 + 提问 + 展示 AI 回答”这条 demo 路联调，也可以开始对接事故流程、报告预览、claim date 更新和 chat-event 触发。
 
-### 4. 远程共享后端
+### 4. 当前前端 demo UI
+
+仓库里现在也已经有一个最小 Next.js demo 前端：
+
+- `frontend/src/app/page.tsx`
+- `frontend/src/lib/api.ts`
+
+它当前可以直接演示：
+
+- `/health`
+- policy upload + ask
+- `GET /cases/{case_id}` snapshot 读取
+- accident report JSON preview
+- stage 3 chat event response + citations
+
+### 5. 远程共享后端
 
 如果队友不在同一地点，也不想各自本地重建 RAG，可以直接连接你这台机器已经跑好的后端。
 
@@ -136,6 +152,7 @@ ClaimMate/
 ├── AGENTS.md
 ├── README.md
 ├── backend/
+├── frontend/
 ├── claimmate_rag_docs/
 ├── demo_policy_pdfs/
 └── docs/
@@ -151,6 +168,15 @@ ClaimMate/
 - `models/`：共享数据结构
 - `tests/`：自动化测试
 - `scripts/`：本地索引、查询、demo、共享后端脚本
+
+### `frontend/`
+
+最小 Next.js demo UI，当前用于：
+
+- health check
+- policy upload / ask
+- accident case snapshot preview
+- report/chat demo response 展示
 
 ### `claimmate_rag_docs/`
 

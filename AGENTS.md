@@ -5,7 +5,7 @@ This file gives coding agents the current source of truth for this repository.
 ## Repository Status
 
 - As of 2026-03-29, this directory is an active Git repository cloned from GitHub.
-- The actual codebase in this repo is currently the **AI/backend scaffold** under `backend/`.
+- The actual codebase in this repo now includes the **AI/backend scaffold plus a minimal Next.js demo frontend** under `frontend/`.
 - The repository root also contains the curated `claimmate_rag_docs/` directory for local KB-B indexing.
 - The repository root also contains `demo_policy_pdfs/` with sample real policy PDFs for KB-A/demo use; keep these separate from `claimmate_rag_docs/` so they are not indexed as KB-B.
 - Project-facing Markdown docs now live under `docs/` except for this `AGENTS.md` file.
@@ -70,6 +70,11 @@ backend/
   - Lightweight app-layer package for request validation, local file paths, policy upload handling, case persistence, response serialization, and FastAPI routers
   - `routers/health.py`, `routers/policy_ask.py`, and `routers/cases_and_accident.py` hold the HTTP entry points instead of `main.py`
   - `demo_seed_data.py` provides a stable accident/chat demo case payload source for scripts and teammate handoff
+
+- `frontend/`
+  - Minimal Next.js demo UI used for teammate integration and class demos
+  - `src/lib/api.ts` wraps shared backend calls for health, policy upload/ask, case snapshot, accident report generation, and chat event demo calls
+  - `src/app/page.tsx` currently demonstrates both policy Q&A and accident/chat preview flows against one shared backend
 
 - `backend/ai/config.py`
   - Centralized environment-based configuration using `pydantic-settings`
@@ -229,7 +234,6 @@ Do **not** assume the following already exist in this repo:
 - PDF report generation pipeline
 - shared SQLAlchemy ORM for application tables
 - database migrations
-- frontend Next.js app
 - deployment config for Railway or Vercel
 
 If you mention those systems, clearly label them as planned integration targets unless you actually add them.

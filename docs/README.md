@@ -32,7 +32,7 @@
 - `YI_HSIEN_LOU_HANDOFF_ZH.md`
   给 Lou 的阶段性中文 handoff。
 - `YI_FRONTEND_API_EXAMPLE_ZH.md`
-  给 Lou 的前端接口调用示例。
+  给 Lou 的前端接口调用示例，现已覆盖 policy、case snapshot、report 和 chat event。
 
 ## 说明
 

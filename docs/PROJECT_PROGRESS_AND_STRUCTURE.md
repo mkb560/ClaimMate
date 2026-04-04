@@ -11,8 +11,8 @@
 | 主线 | 内容 | 当前状态（摘要） |
 |------|------|------------------|
 | **1** | 双知识源 RAG（保单 KB-A + 法规 KB-B） | **最完整**：ingest、检索、grounded 回答、citations、争议/阶段化 chat 逻辑等在 `backend/ai/` 已落地 |
-| **2** | 两阶段事故收集与报告 | **契约 + 后端 API + 存储**已接好；**前端表单、PDF 成品文件**仍待做 |
-| **3** | 理赔群聊中的 AI 支持 | **`handle_chat_event` 等模块已有**；**HTTP 入口已接**；**完整 WebSocket 房间 / invite 产品层**仍待做 |
+| **2** | 两阶段事故收集与报告 | **契约 + 后端 API + 存储**已接好；**前端 demo 已能读 snapshot / report**；**完整表单、PDF 成品文件**仍待做 |
+| **3** | 理赔群聊中的 AI 支持 | **`handle_chat_event` 等模块已有**；**HTTP 入口已接**；**前端 demo 已能展示 chat response**；**完整 WebSocket 房间 / invite 产品层**仍待做 |
 
 项目定位仍是 **课程/原型**：AI core 与产品层后端已大幅打通，但**非**生产级平台（无完整 auth、计费、迁移体系等）。
 
@@ -72,6 +72,7 @@
 - 最小接口约定：[`KE_API_CONTRACT_ZH.md`](KE_API_CONTRACT_ZH.md)  
 - Ke 阶段说明：[`KE_WU_HANDOFF_ZH.md`](KE_WU_HANDOFF_ZH.md)  
 - Lou 对接汇总：[`BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md`](BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md)  
+- Lou 直接调用示例：[`YI_FRONTEND_API_EXAMPLE_ZH.md`](YI_FRONTEND_API_EXAMPLE_ZH.md)  
 - 文档索引：[`docs/README.md`](README.md)
 
 ---
@@ -113,6 +114,7 @@ ClaimMate/
 │   ├── tests/                  # pytest（含 integration 标记用例）
 │   ├── scripts/                # 索引、demo、共享后端等脚本
 │   └── .local_data/            # 本地上传 policy 等（通常不提交大文件）
+├── frontend/                   # Next.js demo UI：policy、snapshot、report、chat response 预览
 ├── claimmate_rag_docs/         # KB-B 法规/参考语料
 ├── demo_policy_pdfs/           # 演示用保单 PDF 样例
 └── docs/                       # 方案、handoff、demo、本文档等
@@ -127,6 +129,7 @@ ClaimMate/
 | `backend/models/` | 与前后端/AI 共享的 **数据结构** 与 **Case ORM** |
 | `backend/tests/` | 单元测试与可选 **真实 DB** 集成测试 |
 | `backend/scripts/` | 运维与联调辅助脚本 |
+| `frontend/` | 现有 Next.js demo UI，已能演示 policy Q&A 和 seeded accident/chat preview |
 | `claimmate_rag_docs/` | KB-B 静态内容，**不要**与 demo 保单目录混索引 |
 | `demo_policy_pdfs/` | KB-A 演示 PDF |
 | `docs/` | 契约、进度、协作、运行说明 |

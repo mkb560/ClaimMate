@@ -1,19 +1,28 @@
 # 给 Lou 的前端调用示例
 
-这份文档是给前端直接接接口用的。目标不是讲后端实现，而是告诉你现在怎么调用这两个最小 API，把 upload + ask 的 demo 页面先做出来。
+这份文档是给前端直接接接口用的。目标不是讲后端实现，而是告诉你现在怎么调用当前最适合前端 demo 的接口，不只是 upload + ask，也包括事故 case snapshot、报告预览和 chat event。
 
 ## 当前可用接口
 
-当前后端已经接好了两个最小接口：
+当前最适合前端先接的接口有两组：
+
+第一组，policy Q&A：
 
 - `POST /cases/{case_id}/policy`
 - `POST /cases/{case_id}/ask`
 
-推荐你先只围绕这两个接口做页面。
+第二组，事故 / 报告 / chat：
+
+- `POST /cases`
+- `GET /cases/{case_id}`
+- `POST /cases/{case_id}/accident/report`
+- `POST /cases/{case_id}/chat/event`
+
+如果你只想先做最短 demo，还是可以只做 upload + ask；但如果你要继续接第二、第三主线，现在已经不需要自己猜接口了。
 
 ## 建议的前端页面流
 
-最简单也最稳的 demo 路径：
+最简单也最稳的 policy demo 路径：
 
 1. 用户输入或生成一个 `case_id`
 2. 用户上传一份 PDF
@@ -22,6 +31,14 @@
 5. 用户输入一个问题
 6. 前端调用 `/cases/{case_id}/ask`
 7. 页面展示 answer、disclaimer、citations
+
+事故 / chat demo 的最短路径：
+
+1. 用固定 `case_id`：`demo-accident-2026-04`
+2. 先 `GET /cases/{case_id}` 读取当前 snapshot
+3. 如果要刷新报告，调用 `POST /cases/{case_id}/accident/report`
+4. 再次 `GET /cases/{case_id}`，拿新的 `report_payload` / `chat_context`
+5. 用 `POST /cases/{case_id}/chat/event` 展示 AI chat response
 
 ## 1. 上传 policy PDF
 
@@ -146,7 +163,7 @@ export async function askPolicyQuestion(caseId: string, question: string) {
 
 ## 3. 前端建议的数据类型
 
-你可以先在前端写这两个类型：
+至少建议先写这些类型：
 
 ```ts
 export type UploadPolicyResponse = {
@@ -171,6 +188,19 @@ export type AskResponse = {
   answer: string
   disclaimer: string
   citations: Citation[]
+}
+
+export type CaseSnapshotResponse = {
+  case_id: string
+  claim_notice_at: string | null
+  proof_of_claim_at: string | null
+  last_deadline_alert_at: string | null
+  stage_a: Record<string, unknown>
+  stage_b: Record<string, unknown> | null
+  report_payload: Record<string, unknown> | null
+  chat_context: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
 }
 ```
 
@@ -276,7 +306,85 @@ function CitationList({ citations }: { citations: Citation[] }) {
 }
 ```
 
-## 6. 推荐 demo 问题
+## 6. 事故 / chat 直接可用的 demo case
+
+现在仓库里已经固定了一条事故 demo case：
+
+- `demo-accident-2026-04`
+
+如果你本地或共享后端已经跑过：
+
+- [seed_accident_demo.py](/Users/dingmingtao/Desktop/USC/研二下/DSCI560/ClaimMate/backend/scripts/seed_accident_demo.py)
+
+你就可以直接这样用：
+
+### 读取 snapshot
+
+```ts
+export async function getCaseSnapshot(caseId: string) {
+  const response = await fetch(`/cases/${caseId}`, {
+    method: "GET",
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || "Load case snapshot failed")
+  }
+
+  return response.json()
+}
+```
+
+### 触发 report 重新生成
+
+```ts
+export async function generateAccidentReport(caseId: string) {
+  const response = await fetch(`/cases/${caseId}/accident/report`, {
+    method: "POST",
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || "Generate report failed")
+  }
+
+  return response.json()
+}
+```
+
+### 触发 stage 3 chat event
+
+```ts
+export async function sendChatEvent(caseId: string) {
+  const response = await fetch(`/cases/${caseId}/chat/event`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sender_role: "owner",
+      message_text: "@AI What is the 15-day acknowledgment rule for a California claim?",
+      participants: [
+        { user_id: "owner-1", role: "owner" },
+        { user_id: "adjuster-1", role: "adjuster" },
+      ],
+      invite_sent: true,
+      trigger: "MESSAGE",
+      metadata: { demo_label: "claim_rule_stage_3" },
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || "Chat event failed")
+  }
+
+  return response.json()
+}
+```
+
+## 7. 推荐 demo 问题
 
 如果你要先做固定 demo，可以直接用这些问题：
 
@@ -295,7 +403,7 @@ function CitationList({ citations }: { citations: Citation[] }) {
 - `What is the policy number, policy period, and insurer?`
 - `Does this document say it is a full insurance policy or only verification of insurance?`
 
-## 7. 前端需要注意的错误情况
+## 8. 前端需要注意的错误情况
 
 ### 上传阶段
 
@@ -312,7 +420,7 @@ function CitationList({ citations }: { citations: Citation[] }) {
 
 建议前端统一 toast 或 inline error 文案，不要只在 console 里报错。
 
-## 8. 现阶段最推荐你先做的 UI
+## 9. 现阶段最推荐你先做的 UI
 
 第一版建议你先做：
 
@@ -321,5 +429,8 @@ function CitationList({ citations }: { citations: Citation[] }) {
 3. 问题输入框
 4. 回答展示区
 5. citations 展示区
+6. accident case snapshot 预览区
+7. report summary / comparison rows 预览区
+8. chat event response 展示区
 
-只要这五块先出来，整个 demo 就已经能跑。
+只要这几块先出来，第一、第二、第三主线都能在一个 demo 页里被看见。
