@@ -68,6 +68,7 @@ backend/
 - `backend/app/`
   - Lightweight app-layer package for request validation, local file paths, policy upload handling, case persistence, response serialization, and FastAPI routers
   - `routers/health.py`, `routers/policy_ask.py`, and `routers/cases_and_accident.py` hold the HTTP entry points instead of `main.py`
+  - `demo_seed_data.py` provides a stable accident/chat demo case payload source for scripts and teammate handoff
 
 - `backend/ai/config.py`
   - Centralized environment-based configuration using `pydantic-settings`
@@ -135,6 +136,7 @@ backend/
   - `ingest_local_policy.py`: ingests a local policy PDF into KB-A for a case
   - `query_local_rag.py`: runs a local RAG question against the vector store
   - `run_demo_eval.py`: runs the fixed local demo/eval suite against known policy PDFs and mixed KB-A + KB-B questions
+  - `seed_accident_demo.py`: seeds a stable accident workflow demo case, generates report/chat artifacts, and exports sample JSON for frontend/demo use
 
 ## Current Runtime Behavior
 
@@ -181,6 +183,7 @@ backend/
 - `StageBAccidentIntake` captures the at-home follow-up details, witness info, police report number, and additional notes
 - `build_accident_report_payload(...)` produces a stable intermediate payload for future PDF generation
 - `build_accident_chat_context(...)` produces the future pinned-document/chat context that Ke can attach when group chat is created
+- `backend/scripts/seed_accident_demo.py` can populate a fixed `demo-accident-2026-04` case and export ready-to-use request/response JSON under `backend/.local_data/demo_cases/`
 
 ### Deadline reminders
 

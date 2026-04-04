@@ -17,6 +17,8 @@
 
 - `ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
   第二主线的共享技术契约。
+- `ACCIDENT_CHAT_DEMO_ASSETS_ZH.md`
+  固定事故流程与 chat demo 资产、脚本和样例输出。
 - `DEMO_PLAYBOOK_ZH.md`
   固定 demo 路径、问题顺序和展示重点。
 - `REMOTE_SHARED_BACKEND_ZH.md`
