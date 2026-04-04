@@ -50,6 +50,7 @@
   - `POST /cases/{case_id}/ask`（JSON `question`）  
 - **事故流程 API**  
   - `POST /cases`  
+  - `GET /cases/{case_id}`  
   - `PATCH /cases/{case_id}/accident/stage-a`  
   - `PATCH /cases/{case_id}/accident/stage-b`  
   - `POST /cases/{case_id}/accident/report`  

@@ -115,6 +115,16 @@ def test_case_and_accident_report_round_trip(integration_client: TestClient) -> 
         )
         assert r.status_code == 200
         assert r.json()["claim_notice_at"] is not None
+
+        r = integration_client.get(f"/cases/{created}")
+        assert r.status_code == 200
+        snapshot = r.json()
+        assert snapshot["case_id"] == created
+        assert snapshot["stage_a"]["quick_summary"] == "Integration test rear-end scenario."
+        assert snapshot["stage_b"]["damage_summary"] == "Rear bumper damage."
+        assert snapshot["report_payload"]["case_id"] == created
+        assert snapshot["chat_context"]["case_id"] == created
+        assert snapshot["claim_notice_at"] == "2026-03-28T10:00:00+00:00"
     finally:
         if created is not None:
             asyncio.run(_cleanup_case(created))

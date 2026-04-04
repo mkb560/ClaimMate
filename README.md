@@ -64,6 +64,7 @@ ClaimMate 的完整产品故事有三条主线：
 当前已经能做的不是只有“定 schema”，还包括：
 
 - `POST /cases`
+- `GET /cases/{case_id}`
 - `PATCH /cases/{case_id}/accident/stage-a`
 - `PATCH /cases/{case_id}/accident/stage-b`
 - `POST /cases/{case_id}/accident/report`
@@ -85,6 +86,7 @@ RAG / demo 主路径：
 事故与 case：
 
 - `POST /cases`
+- `GET /cases/{case_id}`
 - `PATCH /cases/{case_id}/accident/stage-a`
 - `PATCH /cases/{case_id}/accident/stage-b`
 - `POST /cases/{case_id}/accident/report`
@@ -248,6 +250,8 @@ curl -X PATCH "http://127.0.0.1:8000/cases/demo-case/accident/stage-a" \
 curl -X PATCH "http://127.0.0.1:8000/cases/demo-case/accident/stage-b" \
   -H "Content-Type: application/json" \
   -d '{"detailed_narrative":"Stopped at a light and got hit from behind.","damage_summary":"Rear bumper damage."}'
+
+curl "http://127.0.0.1:8000/cases/demo-case"
 
 curl -X POST "http://127.0.0.1:8000/cases/demo-case/accident/report"
 ```

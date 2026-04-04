@@ -53,6 +53,16 @@ async def create_case(request: Request, body: CreateCaseBody = CreateCaseBody())
     return {"case_id": case_id}
 
 
+@router.get("/cases/{case_id}")
+async def get_case_snapshot(case_id: str, request: Request) -> dict[str, object]:
+    ensure_db_ready(request)
+    normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    return case_service.serialize_case_snapshot(row)
+
+
 @router.patch("/cases/{case_id}/accident/stage-a")
 async def accident_stage_a(
     case_id: str,

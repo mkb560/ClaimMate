@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
 from models.ai_types import AnswerResponse, Citation
+from models.case_orm import CaseRow
 
 
 class _DummyEngine:
@@ -118,6 +120,65 @@ def test_health_endpoint_reports_ai_ready(monkeypatch, tmp_path: Path) -> None:
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["ai_ready"] is True
+
+
+def test_get_case_snapshot_returns_stored_case_state(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    created_at = datetime(2026, 4, 3, 10, 0, tzinfo=UTC)
+    updated_at = datetime(2026, 4, 3, 11, 30, tzinfo=UTC)
+
+    async def fake_get_case_row(case_id: str):
+        assert case_id == "demo-case"
+        return CaseRow(
+            id="demo-case",
+            claim_notice_at=datetime(2026, 3, 21, 12, 0, tzinfo=UTC),
+            proof_of_claim_at=datetime(2026, 3, 25, 12, 0, tzinfo=UTC),
+            last_deadline_alert_at=None,
+            stage_a_json={"quick_summary": "Rear-end collision.", "drivable": True},
+            stage_b_json={"damage_summary": "Rear bumper cracked."},
+            report_payload_json={"case_id": "demo-case", "report_title": "ClaimMate Accident Report - demo-case"},
+            chat_context_json={"case_id": "demo-case", "pinned_document_title": "ClaimMate Accident Report - demo-case"},
+            created_at=created_at,
+            updated_at=updated_at,
+        )
+
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", fake_get_case_row)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.get("/cases/demo-case")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "case_id": "demo-case",
+        "claim_notice_at": "2026-03-21T12:00:00+00:00",
+        "proof_of_claim_at": "2026-03-25T12:00:00+00:00",
+        "last_deadline_alert_at": None,
+        "stage_a": {"quick_summary": "Rear-end collision.", "drivable": True},
+        "stage_b": {"damage_summary": "Rear bumper cracked."},
+        "report_payload": {
+            "case_id": "demo-case",
+            "report_title": "ClaimMate Accident Report - demo-case",
+        },
+        "chat_context": {
+            "case_id": "demo-case",
+            "pinned_document_title": "ClaimMate Accident Report - demo-case",
+        },
+        "created_at": "2026-04-03T10:00:00+00:00",
+        "updated_at": "2026-04-03T11:30:00+00:00",
+    }
+
+
+def test_get_case_snapshot_returns_404_for_missing_case(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=None))
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.get("/cases/missing-case")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Case not found."}
 
 
 def test_cors_headers_allow_local_frontend_origin(monkeypatch, tmp_path: Path) -> None:

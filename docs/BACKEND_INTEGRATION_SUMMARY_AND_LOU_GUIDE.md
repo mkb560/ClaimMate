@@ -49,6 +49,7 @@ Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/a
 | Method  | Path                                | Purpose                                                                          |
 | ------- | ----------------------------------- | -------------------------------------------------------------------------------- |
 | `POST`  | `/cases`                            | Create a case; optional body `{"case_id": "my-id"}` or server-generated `case-…` |
+| `GET`   | `/cases/{case_id}`                  | Read the current case snapshot: claim dates, Stage A/B JSON, report/chat caches |
 | `PATCH` | `/cases/{case_id}/accident/stage-a` | Merge JSON into Stage A intake                                                   |
 | `PATCH` | `/cases/{case_id}/accident/stage-b` | Merge JSON into Stage B intake                                                   |
 | `POST`  | `/cases/{case_id}/accident/report`  | Build report via `report_payload_builder`, store payload + chat context          |
@@ -103,16 +104,17 @@ Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/a
 ### 5. Suggested UX order
 
 1. `**POST /cases`** (optional if you only use RAG with a known `case_id` string).
-2. Stage A form → `**PATCH .../accident/stage-a**`
-3. Stage B form → `**PATCH .../accident/stage-b**`
-4. `**POST .../accident/report**` then `**GET .../accident/report**` for preview / pinned summary data.
-5. Claim dates when the user has them → `**PATCH .../claim-dates**` (ISO-8601 datetimes).
+2. `**GET /cases/{case_id}`** whenever the page loads or refreshes, so the UI can rehydrate saved state instead of assuming a blank form.
+3. Stage A form → `**PATCH .../accident/stage-a**`
+4. Stage B form → `**PATCH .../accident/stage-b**`
+5. `**POST .../accident/report**` then `**GET .../accident/report**` for preview / pinned summary data.
+6. Claim dates when the user has them → `**PATCH .../claim-dates**` (ISO-8601 datetimes).
 
 ### 6. Errors worth handling in UI
 
 - **503** — `DATABASE_URL is not configured`, `OPENAI_API_KEY is not configured`, or `**AI bootstrap failed: …`** (show a friendly “backend not ready” message).
 - **400** — invalid `case_id`, non-PDF upload, empty question, etc.
-- **404** — missing case or accident report not generated yet on `**GET .../accident/report`**
+- **404** — missing case on `**GET /cases/{case_id}`** or missing accident report on `**GET .../accident/report`**
 - **409** — `**POST /cases`** with a duplicate `case_id`
 
 ### 7. Health check
@@ -143,4 +145,3 @@ Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/a
 - `**DATABASE_URL**` — Postgres with **pgvector**; use async driver `**postgresql+psycopg://...`**
 - `**OPENAI_API_KEY**` — Required for policy ingest + ask + chat AI paths
 - Run `**uvicorn**` from `**backend/**` so `**.env**` is picked up (`ai/config.py` loads `env_file=".env"` relative to the process working directory)
-

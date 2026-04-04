@@ -64,6 +64,21 @@ async def get_case_row(case_id: str) -> CaseRow | None:
         return await session.get(CaseRow, case_id)
 
 
+def serialize_case_snapshot(row: CaseRow) -> dict[str, Any]:
+    return {
+        "case_id": row.id,
+        "claim_notice_at": _jsonable(row.claim_notice_at),
+        "proof_of_claim_at": _jsonable(row.proof_of_claim_at),
+        "last_deadline_alert_at": _jsonable(row.last_deadline_alert_at),
+        "stage_a": dict(row.stage_a_json or {}),
+        "stage_b": row.stage_b_json,
+        "report_payload": row.report_payload_json,
+        "chat_context": row.chat_context_json,
+        "created_at": _jsonable(row.created_at),
+        "updated_at": _jsonable(row.updated_at),
+    }
+
+
 async def patch_stage_a(case_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     sessionmaker = get_sessionmaker()
     now = _utcnow()
