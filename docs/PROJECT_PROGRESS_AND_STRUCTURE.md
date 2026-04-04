@@ -46,6 +46,8 @@
 - **路由分层**：`main.py` 负责应用组装；具体接口在 `backend/app/routers/`  
 - **Policy + Ask（前端 demo 主路径）**  
   - `GET /health`  
+  - `GET /demo/policies`
+  - `GET /cases/{case_id}/policy`
   - `POST /cases/{case_id}/demo/seed-policy`
   - `POST /cases/{case_id}/policy`（`multipart/form-data`，字段名 `file`）  
   - `POST /cases/{case_id}/ask`（JSON `question`）  

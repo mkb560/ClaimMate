@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ai.ingestion.ingest_policy import ingest_local_policy_file
+from ai.ingestion.vector_store import RetrievedChunk, list_policy_chunks
 from app import case_service
 from app.paths import LOCAL_POLICY_STORAGE_ROOT
 
@@ -60,13 +61,28 @@ DEMO_POLICY_SEEDS: tuple[DemoPolicySeed, ...] = (
 
 _SEED_BY_KEY = {seed.key: seed for seed in DEMO_POLICY_SEEDS}
 _SEED_BY_CASE_ID = {seed.default_case_id: seed for seed in DEMO_POLICY_SEEDS}
+_SEED_BY_FILENAME = {seed.filename: seed for seed in DEMO_POLICY_SEEDS}
 _KEY_ALIASES = {
     seed.key.replace("-", "_"): seed.key for seed in DEMO_POLICY_SEEDS
 }
 
 
+def _serialize_seed(seed: DemoPolicySeed) -> dict[str, Any]:
+    return {
+        "policy_key": seed.key,
+        "default_case_id": seed.default_case_id,
+        "label": seed.label,
+        "filename": seed.filename,
+        "sample_questions": list(seed.sample_questions),
+    }
+
+
 def list_demo_policy_keys() -> list[str]:
     return [seed.key for seed in DEMO_POLICY_SEEDS]
+
+
+def list_demo_policies() -> list[dict[str, Any]]:
+    return [_serialize_seed(seed) for seed in DEMO_POLICY_SEEDS]
 
 
 def _normalize_policy_key(policy_key: str) -> str:
@@ -98,6 +114,48 @@ def _copy_demo_policy(case_id: str, seed: DemoPolicySeed) -> Path:
     return target
 
 
+def _extract_policy_filename(chunk: RetrievedChunk) -> str | None:
+    policy_path = chunk.metadata.get("policy_path")
+    if isinstance(policy_path, str) and policy_path.strip():
+        return Path(policy_path).name
+
+    source_label = chunk.metadata.get("source_label")
+    if not isinstance(source_label, str):
+        return None
+    if source_label.startswith("Your Policy (") and source_label.endswith(")"):
+        return source_label[len("Your Policy (") : -1]
+    return None
+
+
+async def get_policy_status(case_id: str) -> dict[str, Any]:
+    chunks = await list_policy_chunks(case_id, limit=None)
+    if not chunks:
+        return {
+            "case_id": case_id,
+            "has_policy": False,
+            "chunk_count": 0,
+            "source_label": None,
+            "filename": None,
+            "demo_policy": None,
+        }
+
+    first = chunks[0]
+    filename = _extract_policy_filename(first)
+    matched_seed = _SEED_BY_FILENAME.get(filename) if filename else None
+    source_label = first.metadata.get("source_label")
+    if not isinstance(source_label, str):
+        source_label = None
+
+    return {
+        "case_id": case_id,
+        "has_policy": True,
+        "chunk_count": len(chunks),
+        "source_label": source_label,
+        "filename": filename,
+        "demo_policy": None if matched_seed is None else _serialize_seed(matched_seed),
+    }
+
+
 async def seed_demo_policy(case_id: str, policy_key: str | None = None) -> dict[str, Any]:
     seed = resolve_demo_policy_seed(case_id, policy_key)
     await case_service.ensure_case(case_id)
@@ -105,11 +163,8 @@ async def seed_demo_policy(case_id: str, policy_key: str | None = None) -> dict[
     chunk_count = await ingest_local_policy_file(saved_path, case_id=case_id)
     return {
         "case_id": case_id,
-        "policy_key": seed.key,
-        "default_case_id": seed.default_case_id,
-        "label": seed.label,
+        **_serialize_seed(seed),
         "filename": saved_path.name,
         "chunk_count": chunk_count,
         "status": "indexed",
-        "sample_questions": list(seed.sample_questions),
     }

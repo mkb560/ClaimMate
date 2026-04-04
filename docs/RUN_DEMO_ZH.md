@@ -102,7 +102,11 @@ demo_policy_pdfs/
 如果你只是想快速演示，最省事的是直接调用内建 seed route：
 
 ```bash
+curl "http://127.0.0.1:8000/demo/policies"
+
 curl -X POST "http://127.0.0.1:8000/cases/allstate-change-2025-05/demo/seed-policy"
+
+curl "http://127.0.0.1:8000/cases/allstate-change-2025-05/policy"
 ```
 
 如果你想把某一份固定 demo PDF 种到自定义 `case_id`，可以显式传 `policy_key`：

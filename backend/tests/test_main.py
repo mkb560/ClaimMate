@@ -65,6 +65,72 @@ def test_upload_policy_endpoint_indexes_pdf(monkeypatch, tmp_path: Path) -> None
     assert saved_path.read_bytes() == b"%PDF-1.4 demo pdf bytes"
 
 
+def test_demo_policy_catalog_endpoint_returns_built_in_policies(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import policy_ask
+
+    monkeypatch.setattr(
+        policy_ask,
+        "list_demo_policies",
+        lambda: [
+            {
+                "policy_key": "allstate-change",
+                "default_case_id": "allstate-change-2025-05",
+                "label": "Allstate policy change packet",
+                "filename": "TEMP_PDF_FILE.pdf",
+                "sample_questions": ["Who are the policyholders and what is the policy number?"],
+            }
+        ],
+    )
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.get("/demo/policies")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "policies": [
+            {
+                "policy_key": "allstate-change",
+                "default_case_id": "allstate-change-2025-05",
+                "label": "Allstate policy change packet",
+                "filename": "TEMP_PDF_FILE.pdf",
+                "sample_questions": ["Who are the policyholders and what is the policy number?"],
+            }
+        ]
+    }
+
+
+def test_get_policy_status_endpoint_returns_indexed_policy_summary(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import policy_ask
+
+    async def fake_get_policy_status(case_id: str):
+        assert case_id == "demo-case"
+        return {
+            "case_id": case_id,
+            "has_policy": True,
+            "chunk_count": 12,
+            "source_label": "Your Policy (TEMP_PDF_FILE.pdf)",
+            "filename": "TEMP_PDF_FILE.pdf",
+            "demo_policy": {
+                "policy_key": "allstate-change",
+                "default_case_id": "allstate-change-2025-05",
+                "label": "Allstate policy change packet",
+                "filename": "TEMP_PDF_FILE.pdf",
+                "sample_questions": [
+                    "Who are the policyholders and what is the policy number?",
+                ],
+            },
+        }
+
+    monkeypatch.setattr(policy_ask, "get_policy_status", fake_get_policy_status)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.get("/cases/demo-case/policy")
+
+    assert response.status_code == 200
+    assert response.json()["has_policy"] is True
+    assert response.json()["demo_policy"]["policy_key"] == "allstate-change"
+
+
 def test_seed_policy_demo_endpoint_returns_seeded_payload(monkeypatch, tmp_path: Path) -> None:
     from app.routers import policy_ask
 

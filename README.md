@@ -83,6 +83,8 @@ ClaimMate 的完整产品故事有三条主线：
 
 RAG / demo 主路径：
 
+- `GET /demo/policies`
+- `GET /cases/{case_id}/policy`
 - `POST /cases/{case_id}/demo/seed-policy`
 - `POST /cases/{case_id}/policy`
 - `POST /cases/{case_id}/ask`
@@ -114,6 +116,8 @@ RAG / demo 主路径：
 它当前可以直接演示：
 
 - `/health`
+- demo policy catalog
+- indexed policy status
 - policy upload + ask
 - seeded accident demo case
 - `GET /cases/{case_id}` snapshot 读取
@@ -196,6 +200,11 @@ ClaimMate/
 
 - `POST /cases/{case_id}/demo/seed-policy`
 
+以及两个配套读接口：
+
+- `GET /demo/policies`
+- `GET /cases/{case_id}/policy`
+
 它会把固定 demo PDF 复制到本地 policy 存储目录并索引进 KB-A。对 3 个内建 demo case：
 
 - `allstate-change-2025-05`
@@ -203,6 +212,8 @@ ClaimMate/
 - `progressive-verification-2026-03`
 
 可以直接用对应 `case_id` 调用，不需要再手动上传 PDF。
+
+如果前端或 demo 页面需要在刷新后恢复当前状态，可以用 `GET /cases/{case_id}/policy` 读取当前是否已经有 KB-A policy、当前文件名、chunk 数量，以及它是否匹配某个内建 demo policy。
 
 ### `docs/`
 
@@ -268,7 +279,11 @@ curl http://127.0.0.1:8000/health
 ### 6. Seed demo 保单或手动上传后提问
 
 ```bash
+curl "http://127.0.0.1:8000/demo/policies"
+
 curl -X POST "http://127.0.0.1:8000/cases/allstate-change-2025-05/demo/seed-policy"
+
+curl "http://127.0.0.1:8000/cases/allstate-change-2025-05/policy"
 
 curl -X POST "http://127.0.0.1:8000/cases/demo-case/policy" \
   -F "file=@/absolute/path/to/policy.pdf"

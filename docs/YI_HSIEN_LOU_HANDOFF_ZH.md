@@ -15,6 +15,9 @@
   - chat AI scaffold
 - 后端产品入口现在已经有最小 demo API：
   - `GET /health`
+  - `GET /demo/policies`
+  - `GET /cases/{case_id}/policy`
+  - `POST /cases/{case_id}/demo/seed-policy`
   - `POST /cases/{case_id}/policy`
   - `POST /cases/{case_id}/ask`
 - 第二主线的共享 schema 也已经先定好了：

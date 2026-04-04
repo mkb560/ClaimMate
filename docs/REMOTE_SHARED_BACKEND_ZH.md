@@ -134,12 +134,16 @@ https://exasperatingly-unprologued-elease.ngrok-free.dev
 
 可用接口：
 - GET /health
+- GET /demo/policies
+- GET /cases/{case_id}/policy
 - POST /cases/{case_id}/demo/seed-policy
 - POST /cases/{case_id}/policy
 - POST /cases/{case_id}/ask
 
 完整地址：
 - https://exasperatingly-unprologued-elease.ngrok-free.dev/health
+- https://exasperatingly-unprologued-elease.ngrok-free.dev/demo/policies
+- https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/policy
 - https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/demo/seed-policy
 - https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/policy
 - https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/ask
@@ -157,14 +161,20 @@ https://exasperatingly-unprologued-elease.ngrok-free.dev
 1. 健康检查
 curl https://exasperatingly-unprologued-elease.ngrok-free.dev/health
 
-2. 用固定 demo case 直接 seed policy
+2. 先看 demo policy catalog
+curl https://exasperatingly-unprologued-elease.ngrok-free.dev/demo/policies
+
+3. 用固定 demo case 直接 seed policy
 curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/allstate-change-2025-05/demo/seed-policy"
 
-3. 上传 policy PDF
+4. 读当前 case 的 policy 状态
+curl https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/allstate-change-2025-05/policy
+
+5. 上传 policy PDF
 curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/demo-case/policy" \
   -F "file=@/absolute/path/to/policy.pdf"
 
-4. 提问
+6. 提问
 curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/allstate-change-2025-05/ask" \
   -H "Content-Type: application/json" \
   -d '{"question":"Who are the policyholders and what is the policy number?"}'

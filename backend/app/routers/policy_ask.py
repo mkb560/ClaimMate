@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 from ai.ingestion.ingest_policy import ingest_local_policy_file
 from ai.rag.query_engine import answer_policy_question
 from app.case_validation import validate_case_id
-from app.demo_policy_service import list_demo_policy_keys, seed_demo_policy
-from app.deps import ensure_ai_ready
+from app.demo_policy_service import get_policy_status, list_demo_policies, list_demo_policy_keys, seed_demo_policy
+from app.deps import ensure_ai_ready, ensure_db_ready
 from app.paths import LOCAL_POLICY_STORAGE_ROOT
 from app.policy_upload import save_uploaded_policy
 from app import case_service
@@ -23,6 +23,18 @@ class AskRequest(BaseModel):
 
 class SeedPolicyBody(BaseModel):
     policy_key: str | None = Field(default=None, max_length=64)
+
+
+@router.get("/demo/policies")
+async def get_demo_policy_catalog() -> dict[str, object]:
+    return {"policies": list_demo_policies()}
+
+
+@router.get("/cases/{case_id}/policy")
+async def get_case_policy_status(case_id: str, request: Request) -> dict[str, object]:
+    ensure_db_ready(request)
+    normalized_case_id = validate_case_id(case_id)
+    return await get_policy_status(normalized_case_id)
 
 
 @router.post("/cases/{case_id}/policy")

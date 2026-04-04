@@ -57,6 +57,8 @@ backend/
   - Routed REST endpoints now include:
     - `POST /cases` for case creation
     - `GET /cases/{case_id}` for reading the current case snapshot, including accident JSON and cached report/chat payloads
+    - `GET /demo/policies` for listing the fixed demo policy catalog
+    - `GET /cases/{case_id}/policy` for reading the currently indexed policy summary for a case id
     - `POST /cases/{case_id}/demo/seed-policy` for seeding one of the fixed demo policy PDFs into KB-A for a chosen case id
     - `POST /cases/{case_id}/demo/seed-accident` for seeding the fixed accident/chat demo payloads into a chosen case id
     - `POST /cases/{case_id}/policy` for local policy PDF upload + KB-A indexing
@@ -72,7 +74,7 @@ backend/
   - Lightweight app-layer package for request validation, local file paths, policy upload handling, case persistence, response serialization, and FastAPI routers
   - `routers/health.py`, `routers/policy_ask.py`, and `routers/cases_and_accident.py` hold the HTTP entry points instead of `main.py`
   - `demo_seed_data.py` provides a stable accident/chat demo case payload source for scripts and teammate handoff
-  - `demo_policy_service.py` provides the stable mapping from demo policy keys and fixed demo case ids to local PDF copies + KB-A ingestion
+  - `demo_policy_service.py` provides the stable mapping from demo policy keys and fixed demo case ids to local PDF copies + KB-A ingestion, plus read helpers for demo policy catalog and indexed policy status
 
 - `frontend/`
   - Minimal Next.js demo UI used for teammate integration and class demos
@@ -168,6 +170,8 @@ backend/
 
 - `POST /cases` creates a case row, either with a caller-provided `case_id` or a generated `case-...` ID
 - `GET /cases/{case_id}` returns the current app-layer snapshot: claim dates, stored Stage A/B JSON, and cached report/chat payloads when present
+- `GET /demo/policies` returns the 3 built-in demo policies, their default case ids, filenames, labels, and sample questions
+- `GET /cases/{case_id}/policy` returns whether KB-A policy chunks exist for that case, the indexed filename/source label, chunk count, and matched demo policy metadata when applicable
 - `POST /cases/{case_id}/demo/seed-policy` copies a stable demo PDF from `demo_policy_pdfs/` into local policy storage, ingests it into KB-A, and returns sample questions for that document
 - `POST /cases/{case_id}/demo/seed-accident` populates a stable accident demo case and returns seeded snapshot/report/chat sample data for frontend/demo use
 - `POST /cases/{case_id}/policy` and `POST /cases/{case_id}/ask` now call `ensure_case(...)`, so pure RAG/demo flows do not require explicit case creation first

@@ -8,6 +8,8 @@
 
 第一组，policy Q&A：
 
+- `GET /demo/policies`
+- `GET /cases/{case_id}/policy`
 - `POST /cases/{case_id}/demo/seed-policy`
 - `POST /cases/{case_id}/policy`
 - `POST /cases/{case_id}/ask`
@@ -26,12 +28,13 @@
 
 最简单也最稳的 policy demo 路径：
 
-1. 直接用固定 demo `case_id`，比如 `allstate-change-2025-05`
-2. 前端调用 `/cases/{case_id}/demo/seed-policy`
-3. 返回后显示 “policy 已经 indexed”
-4. 用户输入一个问题
-5. 前端调用 `/cases/{case_id}/ask`
-6. 页面展示 answer、disclaimer、citations
+1. 先 `GET /demo/policies`，拿到 demo policy 列表
+2. 直接用固定 demo `case_id`，比如 `allstate-change-2025-05`
+3. 前端调用 `/cases/{case_id}/demo/seed-policy`
+4. 再 `GET /cases/{case_id}/policy`，确认当前已经 indexed 哪份 policy
+5. 用户输入一个问题
+6. 前端调用 `/cases/{case_id}/ask`
+7. 页面展示 answer、disclaimer、citations
 
 如果你要支持真实上传，再补：
 
@@ -118,7 +121,78 @@ export async function seedDemoPolicy(caseId: string, policyKey?: string) {
 - 把 `sample_questions` 做成快捷按钮
 - 直接解锁 ask 输入框，不再要求手动上传
 
-## 2. 上传 policy PDF
+## 2. 读取 demo policy catalog
+
+### 请求
+
+接口：
+
+```text
+GET /demo/policies
+```
+
+### 成功返回示例
+
+```json
+{
+  "policies": [
+    {
+      "policy_key": "allstate-change",
+      "default_case_id": "allstate-change-2025-05",
+      "label": "Allstate policy change packet",
+      "filename": "TEMP_PDF_FILE.pdf",
+      "sample_questions": [
+        "Who are the policyholders and what is the policy number?"
+      ]
+    }
+  ]
+}
+```
+
+### 前端最适合怎么用
+
+- 做一个 demo policy picker
+- 用 `default_case_id` 直接填 case selector
+- 用 `sample_questions` 做快捷问题
+
+## 3. 读取当前 case 的 policy 状态
+
+### 请求
+
+接口：
+
+```text
+GET /cases/{case_id}/policy
+```
+
+### 成功返回示例
+
+```json
+{
+  "case_id": "allstate-change-2025-05",
+  "has_policy": true,
+  "chunk_count": 10,
+  "source_label": "Your Policy (TEMP_PDF_FILE.pdf)",
+  "filename": "TEMP_PDF_FILE.pdf",
+  "demo_policy": {
+    "policy_key": "allstate-change",
+    "default_case_id": "allstate-change-2025-05",
+    "label": "Allstate policy change packet",
+    "filename": "TEMP_PDF_FILE.pdf",
+    "sample_questions": [
+      "Who are the policyholders and what is the policy number?"
+    ]
+  }
+}
+```
+
+### 前端最适合怎么用
+
+- 页面刷新后恢复 “当前已经索引了哪份 policy”
+- 决定 ask 输入框是否应该可用
+- 如果 `demo_policy` 不为空，直接显示推荐问题
+
+## 4. 上传 policy PDF
 
 ### 请求
 
@@ -179,7 +253,7 @@ export async function uploadPolicy(caseId: string, file: File) {
 - 显示 chunk 数量
 - 自动解锁问答输入框
 
-## 3. 提问 ask API
+## 5. 提问 ask API
 
 ### 请求
 
