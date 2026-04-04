@@ -1,5 +1,5 @@
 from ai.ingestion.vector_store import RetrievedChunk
-from ai.policy.fact_extractor import answer_structured_policy_question, extract_policy_facts
+from ai.policy.fact_extractor import answer_structured_policy_question, detect_requested_policy_fact_keys, extract_policy_facts
 
 
 def test_extract_policyholders_and_policy_number_from_allstate_style_chunk() -> None:
@@ -42,3 +42,84 @@ def test_answer_structured_policy_question_prefers_deterministic_fact_answer() -
     assert "871890019" in answer.answer
     assert len(answer.citations) >= 1
     assert answer.citations[0].source_type == "kb_a"
+
+
+def test_answer_structured_policy_question_handles_document_type_and_policyholders() -> None:
+    chunks = [
+        RetrievedChunk(
+            source_type="kb_a",
+            chunk_text=(
+                "Here is your automobile insurance renewal offer for the next six months. "
+                "Policyholder(s) Anlan Cai Mingtao Ding Policy number 804 448 188"
+            ),
+            document_id="policy_pdf",
+            page_num=1,
+            section="RENEWAL",
+            metadata={"source_label": "Your Policy (TEMP_PDF_FILE 2.pdf)"},
+        )
+    ]
+
+    answer = answer_structured_policy_question(
+        "What kind of insurance packet is this and who are the policyholders?",
+        chunks,
+    )
+
+    assert answer is not None
+    assert "renewal" in answer.answer.lower()
+    assert "Anlan Cai" in answer.answer
+    assert "Mingtao Ding" in answer.answer
+
+
+def test_answer_structured_policy_question_handles_policy_number_period_and_insurer() -> None:
+    chunks = [
+        RetrievedChunk(
+            source_type="kb_a",
+            chunk_text=(
+                "Policy Number: 871890019 Underwritten by: Progressive Select Ins Co "
+                "Policy period: Apr 4, 2026 - Oct 4, 2026"
+            ),
+            document_id="policy_pdf",
+            page_num=1,
+            section="PROGRESSIVE",
+            metadata={"source_label": "Your Policy (Verification of Insurance.pdf)"},
+        )
+    ]
+
+    answer = answer_structured_policy_question(
+        "What is the policy number, policy period, and insurer?",
+        chunks,
+    )
+
+    assert answer is not None
+    assert "871890019" in answer.answer
+    assert "Apr 4, 2026" in answer.answer
+    assert "Oct 4, 2026" in answer.answer
+    assert "Progressive Select Ins Co" in answer.answer
+
+
+def test_answer_structured_policy_question_handles_discount_without_false_policy_period_requirement() -> None:
+    chunks = [
+        RetrievedChunk(
+            source_type="kb_a",
+            chunk_text=(
+                "Your premium for the current policy period has not been affected. "
+                "Your discount savings for this policy period\nare: $965.29."
+            ),
+            document_id="policy_pdf",
+            page_num=1,
+            section="DISCOUNTS",
+            metadata={"source_label": "Your Policy (TEMP_PDF_FILE.pdf)"},
+        )
+    ]
+
+    assert detect_requested_policy_fact_keys("What discount savings are listed for this policy period?") == {
+        "discount_total"
+    }
+
+    answer = answer_structured_policy_question(
+        "What discount savings are listed for this policy period?",
+        chunks,
+    )
+
+    assert answer is not None
+    assert "$965.29" in answer.answer

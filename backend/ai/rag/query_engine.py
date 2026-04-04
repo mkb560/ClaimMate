@@ -8,8 +8,9 @@ from ai.clients import get_openai_client
 from ai.config import ai_config
 from ai.ingestion.embedder import embed_texts
 from ai.ingestion.kb_b_catalog import DISPUTE_RELEVANT_DOCUMENT_IDS
-from ai.ingestion.vector_store import list_policy_chunks, search_case_chunks, search_kb_b_chunks
-from ai.policy.fact_extractor import answer_structured_policy_question
+from ai.ingestion.vector_store import list_kb_b_chunks, list_policy_chunks, search_case_chunks, search_kb_b_chunks
+from ai.policy.fact_extractor import answer_structured_policy_question, is_structured_policy_fact_question
+from ai.rag.regulatory_fact_extractor import CLAIM_ACK_RULE_DOCUMENT_ID, answer_structured_regulatory_question, is_structured_regulatory_question
 from ai.rag.citation_formatter import build_context_sections, citations_from_answer, fallback_citations, source_label_for_chunk
 from ai.rag.prompt_templates import DISCLAIMER_FOOTER, NOT_ENOUGH_INFO_MESSAGE, SYSTEM_PROMPT_DISPUTE, SYSTEM_PROMPT_RAG, SYSTEM_PROMPT_RESCUE, compose_system_prompt
 from models.ai_types import AnswerResponse, ChatStage
@@ -120,11 +121,28 @@ async def _generate_answer(
 
 
 async def answer_policy_question(case_id: str, question: str, *, client: AsyncOpenAI | None = None) -> AnswerResponse:
+    # Structured metadata questions are the most common demo path, so answer them
+    # directly from the indexed policy corpus before spending an embedding call.
+    if is_structured_policy_fact_question(question):
+        all_policy_chunks = await list_policy_chunks(case_id, limit=None)
+        if structured_answer := answer_structured_policy_question(question, all_policy_chunks):
+            structured_answer.answer = _normalize_answer(structured_answer.answer)
+            structured_answer.disclaimer = DISCLAIMER_FOOTER
+            return structured_answer
+
+    if is_structured_regulatory_question(question):
+        kb_b_chunks = await list_kb_b_chunks(limit=None, document_ids=[CLAIM_ACK_RULE_DOCUMENT_ID])
+        if structured_answer := answer_structured_regulatory_question(question, kb_b_chunks):
+            structured_answer.answer = _normalize_answer(structured_answer.answer)
+            structured_answer.disclaimer = DISCLAIMER_FOOTER
+            return structured_answer
+
     query_embedding = await _embed_query(question)
     policy_chunks, regulatory_chunks = await asyncio.gather(
         search_case_chunks(case_id, query_embedding, top_k=ai_config.rag_top_k_per_source),
         search_kb_b_chunks(query_embedding, top_k=ai_config.rag_top_k_per_source),
     )
+
     if policy_chunks:
         all_policy_chunks = await list_policy_chunks(case_id, limit=None)
         if structured_answer := answer_structured_policy_question(question, all_policy_chunks):

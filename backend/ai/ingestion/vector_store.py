@@ -165,3 +165,15 @@ async def list_policy_chunks(case_id: str, *, limit: int | None = 3) -> list[Ret
             stmt = stmt.limit(limit)
         result = await session.scalars(stmt)
         return _to_retrieved_chunks(result.all())
+
+
+async def list_kb_b_chunks(*, limit: int | None = 3, document_ids: Sequence[str] | None = None) -> list[RetrievedChunk]:
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as session:
+        stmt = select(VectorDocument).where(VectorDocument.source_type == SourceType.KB_B.value)
+        if document_ids:
+            stmt = stmt.where(VectorDocument.document_id.in_(list(document_ids)))
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        result = await session.scalars(stmt)
+        return _to_retrieved_chunks(result.all())

@@ -14,7 +14,7 @@ POLICY_PERIOD_RE = re.compile(
     re.IGNORECASE,
 )
 DISCOUNT_TOTAL_RE = re.compile(
-    r"discount savings(?: for this policy period)? are:\s*\$([0-9,]+\.\d{2})",
+    r"discount savings(?:\s+for this policy period)?\s+are:\s*\$([0-9,]+\.\d{2})",
     re.IGNORECASE,
 )
 CHANGE_EFFECTIVE_RE = re.compile(
@@ -52,6 +52,11 @@ class PolicyFact:
 
 def _normalize_space(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _with_indefinite_article(text: str) -> str:
+    article = "an" if text[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
+    return f"{article} {text}"
 
 
 def _find_matches(pattern: re.Pattern[str], chunks: Sequence[RetrievedChunk]) -> list[tuple[RetrievedChunk, re.Match[str]]]:
@@ -192,16 +197,24 @@ def _first_fact(facts: dict[str, list[PolicyFact]], key: str) -> PolicyFact | No
     return values[0] if values else None
 
 
-def _detect_requested_keys(question: str) -> set[str]:
+def detect_requested_policy_fact_keys(question: str) -> set[str]:
     lowered = question.lower()
     keys: set[str] = set()
-    if "policyholder" in lowered or "named insured" in lowered or ("who" in lowered and "policy" in lowered):
+    if (
+        "policyholder" in lowered
+        or "policyholders" in lowered
+        or "named insured" in lowered
+        or ("who" in lowered and ("policy" in lowered or "insured" in lowered))
+    ):
         keys.add("policyholders")
     if "policy number" in lowered:
         keys.add("policy_number")
-    if "policy period" in lowered or ("effective" in lowered and "change" not in lowered):
+    if (
+        ("policy period" in lowered and "for this policy period" not in lowered and "discount" not in lowered)
+        or ("effective" in lowered and "change" not in lowered)
+    ):
         keys.add("policy_period")
-    if "insurer" in lowered or "underwritten" in lowered or "company" in lowered:
+    if "insurer" in lowered or "underwritten" in lowered or "company" in lowered or "carrier" in lowered:
         keys.add("insurer")
     if "change" in lowered:
         keys.update({"policy_change", "change_effective_date"})
@@ -209,11 +222,15 @@ def _detect_requested_keys(question: str) -> set[str]:
         keys.add("discount_total")
     if "optional coverage" in lowered or "highlight" in lowered or "identity theft" in lowered:
         keys.add("optional_coverage")
-    if "what kind of" in lowered or "renewal" in lowered or "packet" in lowered:
+    if "what kind of" in lowered or "renewal" in lowered or "packet" in lowered or "document" in lowered:
         keys.add("document_type")
     if "full insurance policy" in lowered or "verification of insurance" in lowered:
         keys.update({"document_type", "not_full_policy"})
     return keys
+
+
+def is_structured_policy_fact_question(question: str) -> bool:
+    return bool(detect_requested_policy_fact_keys(question))
 
 
 def _fact_to_citation(fact: PolicyFact) -> Citation:
@@ -230,6 +247,7 @@ def _fact_to_citation(fact: PolicyFact) -> Citation:
 def _build_fact_answer(requested_keys: set[str], facts: dict[str, list[PolicyFact]]) -> AnswerResponse | None:
     fact_to_ref: dict[tuple[str, int | None, str | None], str] = {}
     citations: list[Citation] = []
+    remaining_keys = set(requested_keys)
 
     def ref_for(fact: PolicyFact) -> str:
         key = (fact.source_label, fact.page_num, fact.section)
@@ -242,59 +260,82 @@ def _build_fact_answer(requested_keys: set[str], facts: dict[str, list[PolicyFac
 
     policyholders = _first_fact(facts, "policyholders")
     policy_number = _first_fact(facts, "policy_number")
-    if {"policyholders", "policy_number"} & requested_keys and policyholders and policy_number:
+    if {"policyholders", "policy_number"} <= remaining_keys and policyholders and policy_number:
         lines.append(
             f"The policyholders listed in the document are {policyholders.value}. [{ref_for(policyholders)}] "
             f"The policy number is {policy_number.value}. [{ref_for(policy_number)}]"
         )
-        requested_keys -= {"policyholders", "policy_number"}
+        remaining_keys -= {"policyholders", "policy_number"}
 
     document_type = _first_fact(facts, "document_type")
-    if "document_type" in requested_keys and document_type:
-        lines.append(f"This document is a {document_type.value}. [{ref_for(document_type)}]")
-        requested_keys.remove("document_type")
-
-    not_full_policy = _first_fact(facts, "not_full_policy")
-    if "not_full_policy" in requested_keys and not_full_policy:
-        lines.append(f"{not_full_policy.value} [{ref_for(not_full_policy)}]")
-        requested_keys.remove("not_full_policy")
+    if {"document_type", "policyholders"} <= remaining_keys and document_type and policyholders:
+        lines.append(
+            f"This document is {_with_indefinite_article(document_type.value)}. [{ref_for(document_type)}] "
+            f"The policyholders listed in the document are {policyholders.value}. [{ref_for(policyholders)}]"
+        )
+        remaining_keys -= {"document_type", "policyholders"}
 
     policy_period = _first_fact(facts, "policy_period")
     insurer = _first_fact(facts, "insurer")
-    if {"policy_period", "insurer"} & requested_keys:
+    if {"policy_number", "policy_period", "insurer"} <= remaining_keys and policy_number and policy_period and insurer:
+        lines.append(
+            f"The policy number is {policy_number.value}. [{ref_for(policy_number)}] "
+            f"The policy period is {policy_period.value}. [{ref_for(policy_period)}] "
+            f"The insurer listed in the document is {insurer.value}. [{ref_for(insurer)}]"
+        )
+        remaining_keys -= {"policy_number", "policy_period", "insurer"}
+
+    if "document_type" in remaining_keys and document_type:
+        lines.append(f"This document is {_with_indefinite_article(document_type.value)}. [{ref_for(document_type)}]")
+        remaining_keys.remove("document_type")
+
+    not_full_policy = _first_fact(facts, "not_full_policy")
+    if "not_full_policy" in remaining_keys and not_full_policy:
+        lines.append(f"{not_full_policy.value} [{ref_for(not_full_policy)}]")
+        remaining_keys.remove("not_full_policy")
+
+    if "policyholders" in remaining_keys and policyholders:
+        lines.append(f"The policyholders listed in the document are {policyholders.value}. [{ref_for(policyholders)}]")
+        remaining_keys.remove("policyholders")
+
+    if "policy_number" in remaining_keys and policy_number:
+        lines.append(f"The policy number is {policy_number.value}. [{ref_for(policy_number)}]")
+        remaining_keys.remove("policy_number")
+
+    if {"policy_period", "insurer"} & remaining_keys:
         if policy_period and insurer:
             lines.append(
                 f"The policy period is {policy_period.value}, and the insurer listed in the document is {insurer.value}. "
                 f"[{ref_for(policy_period)}][{ref_for(insurer)}]"
             )
-            requested_keys -= {"policy_period", "insurer"}
+            remaining_keys -= {"policy_period", "insurer"}
         elif policy_period:
             lines.append(f"The policy period is {policy_period.value}. [{ref_for(policy_period)}]")
-            requested_keys.remove("policy_period")
+            remaining_keys.remove("policy_period")
         elif insurer:
             lines.append(f"The insurer listed in the document is {insurer.value}. [{ref_for(insurer)}]")
-            requested_keys.remove("insurer")
+            remaining_keys.remove("insurer")
 
     policy_change = _first_fact(facts, "policy_change")
     change_effective_date = _first_fact(facts, "change_effective_date")
-    if {"policy_change", "change_effective_date"} & requested_keys and policy_change and change_effective_date:
+    if {"policy_change", "change_effective_date"} & remaining_keys and policy_change and change_effective_date:
         lines.append(
             f"The document confirms the following policy change: {policy_change.value}. It is effective {change_effective_date.value}. "
             f"[{ref_for(policy_change)}]"
         )
-        requested_keys -= {"policy_change", "change_effective_date"}
+        remaining_keys -= {"policy_change", "change_effective_date"}
 
     discount_total = _first_fact(facts, "discount_total")
-    if "discount_total" in requested_keys and discount_total:
+    if "discount_total" in remaining_keys and discount_total:
         lines.append(f"The document lists total discount savings of {discount_total.value} for the policy period. [{ref_for(discount_total)}]")
-        requested_keys.remove("discount_total")
+        remaining_keys.remove("discount_total")
 
     optional_coverage = _first_fact(facts, "optional_coverage")
-    if "optional_coverage" in requested_keys and optional_coverage:
+    if "optional_coverage" in remaining_keys and optional_coverage:
         lines.append(f"The optional coverage highlighted in this document is {optional_coverage.value}. [{ref_for(optional_coverage)}]")
-        requested_keys.remove("optional_coverage")
+        remaining_keys.remove("optional_coverage")
 
-    if not lines or requested_keys:
+    if not lines or remaining_keys:
         return None
 
     return AnswerResponse(
@@ -305,7 +346,7 @@ def _build_fact_answer(requested_keys: set[str], facts: dict[str, list[PolicyFac
 
 
 def answer_structured_policy_question(question: str, chunks: Sequence[RetrievedChunk]) -> AnswerResponse | None:
-    requested_keys = _detect_requested_keys(question)
+    requested_keys = detect_requested_policy_fact_keys(question)
     if not requested_keys:
         return None
     facts = extract_policy_facts(chunks)

@@ -91,6 +91,14 @@ export OPENAI_API_KEY="your_key"
 python scripts/run_demo_eval.py --json-out /tmp/claimmate_demo_eval.json
 ```
 
+当前 `run_demo_eval.py` 会默认使用仓库根目录 `demo_policy_pdfs/` 里的 3 份固定 demo PDF。
+
+- 如果本地数据库里还没有 KB-B，脚本会先自动把仓库根目录 `claimmate_rag_docs/` 建成 KB-B
+- 如果对应 `case_id` 还没有索引，脚本会自动 ingest
+- 如果已经有 KB-B 或该 `case_id` 已经有 KB-A chunks，脚本会直接复用已有索引，避免重复 embedding 成本
+- 如果你想强制替换其中某一份 policy，可以继续用 `--ingest-policy CASE_ID=/absolute/path/to/policy.pdf`
+- 脚本仍然需要可用的 `DATABASE_URL` 和有额度的 `OPENAI_API_KEY`；现在如果缺数据库配置或 OpenAI quota 不足，会给出可读错误，而不是直接抛长 traceback
+
 如果 `9/9 passed`，说明当前 demo 题集还是稳定的。
 
 ## Citation 展示建议
@@ -119,5 +127,6 @@ Your Policy (TEMP_PDF_FILE.pdf) | Policy | Page 1
 - ClaimMate 先读取用户自己的 policy PDF
 - 同时把 California claim regulations 做成共享知识库
 - 回答时会优先从 policy 里提取结构化事实
+- 对 policy metadata 类问题，系统会优先走 deterministic extraction；如果已索引 policy chunks 足够，甚至会直接跳过 embedding/LLM，减少 demo 时的回答漂移
 - 如果问题涉及法规义务或理赔时限，会联动 regulatory corpus
 - 最终答案带 citations，方便用户知道依据来自哪里
