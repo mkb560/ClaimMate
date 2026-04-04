@@ -70,6 +70,7 @@
 - 单元测试：`cd backend && pytest`（大量逻辑 mock，不强制本机 Postgres）  
 - 可选集成测试：`pytest -m integration`，需真实 `DATABASE_URL`（Postgres + pgvector），见 `backend/tests/test_integration_cases_db.py`  
 - demo policy seed：`python scripts/seed_demo_policy.py --case-id allstate-change-2025-05`，会把固定 demo PDF 索引进 KB-A  
+- end-to-end smoke：`python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000`，会按真实 HTTP 路径跑 `health -> demo/policies -> seed-policy -> ask -> seed-accident -> chat/event`  
 - 远程共享本机后端：`backend/scripts/run_shared_backend.sh`，说明见 [`REMOTE_SHARED_BACKEND_ZH.md`](REMOTE_SHARED_BACKEND_ZH.md)
 
 ### 5. 文档与前端对接说明
@@ -117,7 +118,7 @@ ClaimMate/
 │   ├── app/                    # 应用层：case 服务、校验、路由子包 routers/
 │   ├── models/                 # 共享模型：accident_types、ai_types、case_orm 等
 │   ├── tests/                  # pytest（含 integration 标记用例）
-│   ├── scripts/                # 索引、demo seed、共享后端等脚本
+│   ├── scripts/                # 索引、demo seed、smoke、共享后端等脚本
 │   └── .local_data/            # 本地上传 policy 等（通常不提交大文件）
 ├── frontend/                   # Next.js demo UI：policy、snapshot、report、chat response 预览
 ├── claimmate_rag_docs/         # KB-B 法规/参考语料

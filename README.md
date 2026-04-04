@@ -132,6 +132,7 @@ RAG / demo 主路径：
 
 - `backend/scripts/run_shared_backend.sh`
 - `backend/scripts/seed_demo_policy.py`
+- `backend/scripts/run_demo_smoke.py`
 - `docs/REMOTE_SHARED_BACKEND_ZH.md`
 
 它会用 `ngrok` 把你本机的 `FastAPI` 服务暴露成临时公网地址，方便 Ke 和 Lou 直接联调。
@@ -305,6 +306,17 @@ curl -X POST "http://127.0.0.1:8000/cases/demo-policy-case/demo/seed-policy" \
 
 - `docs/RUN_DEMO_ZH.md`
 
+### 6.5. 一键跑完整 smoke flow
+
+如果你想确认当前后端从 `health -> demo/policies -> seed-policy -> ask -> seed-accident -> chat/event` 这条整链都还是通的，可以直接跑：
+
+```bash
+cd backend
+./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000
+```
+
+如果你想直接检查 shared backend，也可以把 `--base-url` 换成当前 ngrok 地址。
+
 ### 7. 创建 case、写入事故信息、生成报告
 
 ```bash
@@ -360,6 +372,13 @@ export DATABASE_URL="postgresql+psycopg://claimmate:claimmate@localhost:5433/cla
 ```bash
 cd backend
 ./.venv/bin/pytest
+```
+
+如果你要做一轮更贴近 demo 的 HTTP smoke：
+
+```bash
+cd backend
+./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000
 ```
 
 如果你本地已经配好真实 `DATABASE_URL`，还可以跑集成测试：

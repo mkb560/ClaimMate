@@ -179,6 +179,12 @@ curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/all
   -H "Content-Type: application/json" \
   -d '{"question":"Who are the policyholders and what is the policy number?"}'
 
+7. 如果你想一次跑完整 smoke
+```bash
+cd backend
+./.venv/bin/python scripts/run_demo_smoke.py --base-url https://exasperatingly-unprologued-elease.ngrok-free.dev
+```
+
 建议：
 - Ke 先按这个 base URL 接后端接口
 - Lou 先把前端 API base URL 指到这个地址，直接做 seed-policy + ask 的 happy path
@@ -191,7 +197,6 @@ curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/all
 - docs/REMOTE_SHARED_BACKEND_ZH.md
 - docs/KE_API_CONTRACT_ZH.md
 - docs/YI_FRONTEND_API_EXAMPLE_ZH.md
-```
 
 ## 最小联调流程
 

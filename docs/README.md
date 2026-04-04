@@ -24,7 +24,7 @@
 - `REMOTE_SHARED_BACKEND_ZH.md`
   如何把你本机后端通过公网共享给远程队友。
 - `RUN_DEMO_ZH.md`
-  本地从零启动 demo 的完整说明。
+  本地从零启动 demo 的完整说明，也包含 `run_demo_smoke.py` 的使用方式。
 - `KE_API_CONTRACT_ZH.md`
   给 Ke 的最小 API 契约。
 - `KE_WU_HANDOFF_ZH.md`

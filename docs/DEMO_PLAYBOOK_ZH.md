@@ -115,6 +115,13 @@ cd backend
 ./.venv/bin/python scripts/seed_demo_policy.py --case-id allstate-change-2025-05
 ```
 
+如果你想在 demo 前做一轮“整条 HTTP 路径都没坏”的检查，也可以跑：
+
+```bash
+cd backend
+./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000
+```
+
 ## Citation 展示建议
 
 前端展示 citations 时，建议这样做：

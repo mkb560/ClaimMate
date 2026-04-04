@@ -179,13 +179,33 @@ Summary: 9/9 passed
 
 说明现在这套固定 demo 题集还是通的。
 
-## 8. 当前推荐 demo 题
+## 8. 跑一轮真实 HTTP smoke
+
+如果你想确认 live backend 这条完整演示路径都还是通的，可以直接跑：
+
+```bash
+cd backend
+./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000
+```
+
+它会按这个顺序检查：
+
+1. `GET /health`
+2. `GET /demo/policies`
+3. `POST /cases/{case_id}/demo/seed-policy`
+4. `POST /cases/{case_id}/ask`
+5. `POST /cases/{case_id}/demo/seed-accident`
+6. `POST /cases/{case_id}/chat/event`
+
+如果你想直接打 shared backend，把 `--base-url` 换成当前 ngrok URL 就行。
+
+## 9. 当前推荐 demo 题
 
 最稳的题集和讲解顺序已经整理在：
 
 - `docs/DEMO_PLAYBOOK_ZH.md`
 
-## 9. 前端接法
+## 10. 前端接法
 
 Lou 的前端接口示例在：
 
@@ -195,7 +215,7 @@ Ke 的接口契约在：
 
 - `docs/KE_API_CONTRACT_ZH.md`
 
-## 10. 当前最常见问题
+## 11. 当前最常见问题
 
 ### `ai_ready` 是 `false`
 
@@ -223,7 +243,7 @@ Ke 的接口契约在：
 4. 你问的是当前 demo 文档里真实能答的问题
 5. 如果你走的是固定 demo case，先确认已经调用过 `/cases/{case_id}/demo/seed-policy`
 
-## 11. 远程共享给队友
+## 12. 远程共享给队友
 
 如果 Ke 和 Lou 不在同一地点，不打算各自本地起 RAG，而是直接连你这台机器已经跑好的后端，请看：
 
