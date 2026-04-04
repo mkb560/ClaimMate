@@ -134,11 +134,13 @@ https://exasperatingly-unprologued-elease.ngrok-free.dev
 
 可用接口：
 - GET /health
+- POST /cases/{case_id}/demo/seed-policy
 - POST /cases/{case_id}/policy
 - POST /cases/{case_id}/ask
 
 完整地址：
 - https://exasperatingly-unprologued-elease.ngrok-free.dev/health
+- https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/demo/seed-policy
 - https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/policy
 - https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/{case_id}/ask
 
@@ -155,18 +157,21 @@ https://exasperatingly-unprologued-elease.ngrok-free.dev
 1. 健康检查
 curl https://exasperatingly-unprologued-elease.ngrok-free.dev/health
 
-2. 上传 policy PDF
+2. 用固定 demo case 直接 seed policy
+curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/allstate-change-2025-05/demo/seed-policy"
+
+3. 上传 policy PDF
 curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/demo-case/policy" \
   -F "file=@/absolute/path/to/policy.pdf"
 
-3. 提问
-curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/demo-case/ask" \
+4. 提问
+curl -X POST "https://exasperatingly-unprologued-elease.ngrok-free.dev/cases/allstate-change-2025-05/ask" \
   -H "Content-Type: application/json" \
   -d '{"question":"Who are the policyholders and what is the policy number?"}'
 
 建议：
 - Ke 先按这个 base URL 接后端接口
-- Lou 先把前端 API base URL 指到这个地址，直接做 upload + ask 的 happy path
+- Lou 先把前端 API base URL 指到这个地址，直接做 seed-policy + ask 的 happy path
 
 注意：
 - 这个地址是临时共享地址，如果我重启服务或 tunnel，URL 可能会变

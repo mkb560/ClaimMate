@@ -34,12 +34,15 @@ Still the primary demo path; contract details remain in `**docs/KE_API_CONTRACT_
 
 | Method | Path                      | Notes                                                  |
 | ------ | ------------------------- | ------------------------------------------------------ |
+| `POST` | `/cases/{case_id}/demo/seed-policy` | Seed one of the built-in demo policy PDFs into KB-A; optional JSON body `{"policy_key": "..."}` |
 | `POST` | `/cases/{case_id}/policy` | `multipart/form-data`, field name `**file**`, PDF only |
 | `POST` | `/cases/{case_id}/ask`    | JSON `{"question": "..."}`                             |
 
 
 - `**case_id**` must match `^[A-Za-z0-9_-]{1,64}$`.
 - Upload/ask call `**ensure_case**`: the row is created automatically if missing (no strict requirement to call `POST /cases` first for RAG-only flows).
+- For the 3 fixed demo policy cases (`allstate-change-2025-05`, `allstate-renewal-2025-08`, `progressive-verification-2026-03`), frontend/demo callers can skip manual upload and call `**POST /cases/{case_id}/demo/seed-policy**` directly.
+- For a custom `case_id`, call `**POST /cases/{case_id}/demo/seed-policy**` with JSON `{"policy_key": "allstate-change" | "allstate-renewal" | "progressive-verification"}`.
 
 ### Accident workflow (second line)
 
@@ -88,6 +91,7 @@ Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/a
 
 ### 2. Policy upload
 
+- For the fastest demo path, prefer `**POST /cases/{case_id}/demo/seed-policy**` instead of asking teammates to manually upload a PDF every time.
 - Use `**POST /cases/{case_id}/policy**` with form field `**file**` (not `upload` or `document`).
 - Only **PDF**; server checks magic bytes `%PDF`.
 - Response includes `**chunk_count`** and `**status: "indexed"**` when ingest succeeds.
@@ -105,12 +109,13 @@ Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/a
 ### 5. Suggested UX order
 
 1. `**POST /cases`** (optional if you only use RAG with a known `case_id` string).
-2. For demo mode, you can directly call `**POST /cases/{case_id}/demo/seed-accident**` to prepare a stable seeded case.
-3. `**GET /cases/{case_id}`** whenever the page loads or refreshes, so the UI can rehydrate saved state instead of assuming a blank form.
-4. Stage A form → `**PATCH .../accident/stage-a**`
-5. Stage B form → `**PATCH .../accident/stage-b**`
-6. `**POST .../accident/report**` then `**GET .../accident/report**` for preview / pinned summary data.
-7. Claim dates when the user has them → `**PATCH .../claim-dates**` (ISO-8601 datetimes).
+2. For the fastest policy demo, use one of the fixed demo case ids and call `**POST /cases/{case_id}/demo/seed-policy**`.
+3. For accident demo mode, you can directly call `**POST /cases/{case_id}/demo/seed-accident**` to prepare a stable seeded case.
+4. `**GET /cases/{case_id}`** whenever the page loads or refreshes, so the UI can rehydrate saved state instead of assuming a blank form.
+5. Stage A form → `**PATCH .../accident/stage-a**`
+6. Stage B form → `**PATCH .../accident/stage-b**`
+7. `**POST .../accident/report**` then `**GET .../accident/report**` for preview / pinned summary data.
+8. Claim dates when the user has them → `**PATCH .../claim-dates**` (ISO-8601 datetimes).
 
 ### 6. Errors worth handling in UI
 

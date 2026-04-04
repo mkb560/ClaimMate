@@ -8,6 +8,7 @@
 
 第一组，policy Q&A：
 
+- `POST /cases/{case_id}/demo/seed-policy`
 - `POST /cases/{case_id}/policy`
 - `POST /cases/{case_id}/ask`
 
@@ -25,13 +26,19 @@
 
 最简单也最稳的 policy demo 路径：
 
+1. 直接用固定 demo `case_id`，比如 `allstate-change-2025-05`
+2. 前端调用 `/cases/{case_id}/demo/seed-policy`
+3. 返回后显示 “policy 已经 indexed”
+4. 用户输入一个问题
+5. 前端调用 `/cases/{case_id}/ask`
+6. 页面展示 answer、disclaimer、citations
+
+如果你要支持真实上传，再补：
+
 1. 用户输入或生成一个 `case_id`
 2. 用户上传一份 PDF
 3. 前端调用 `/cases/{case_id}/policy`
-4. 上传成功后，显示 “policy 已经 indexed”
-5. 用户输入一个问题
-6. 前端调用 `/cases/{case_id}/ask`
-7. 页面展示 answer、disclaimer、citations
+4. 上传成功后，显示文件名和 chunk 数量
 
 事故 / chat demo 的最短路径：
 
@@ -42,7 +49,76 @@
 5. 再次 `GET /cases/{case_id}`，拿新的 `report_payload` / `chat_context`
 6. 用 `POST /cases/{case_id}/chat/event` 展示 AI chat response
 
-## 1. 上传 policy PDF
+## 1. Seed 固定 demo policy
+
+### 请求
+
+接口：
+
+```text
+POST /cases/{case_id}/demo/seed-policy
+```
+
+如果 `case_id` 本身就是固定 demo case，可以直接空 body 调用：
+
+- `allstate-change-2025-05`
+- `allstate-renewal-2025-08`
+- `progressive-verification-2026-03`
+
+如果你想把固定 demo PDF 种到自定义 `case_id`，请求体传：
+
+```json
+{
+  "policy_key": "progressive-verification"
+}
+```
+
+### 前端调用示例
+
+```ts
+export async function seedDemoPolicy(caseId: string, policyKey?: string) {
+  const response = await fetch(`/cases/${caseId}/demo/seed-policy`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(policyKey ? { policy_key: policyKey } : {}),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || "Seed demo policy failed")
+  }
+
+  return response.json()
+}
+```
+
+### 成功返回示例
+
+```json
+{
+  "case_id": "allstate-change-2025-05",
+  "policy_key": "allstate-change",
+  "default_case_id": "allstate-change-2025-05",
+  "label": "Allstate policy change packet",
+  "filename": "TEMP_PDF_FILE.pdf",
+  "chunk_count": 6,
+  "status": "indexed",
+  "sample_questions": [
+    "Who are the policyholders and what is the policy number?",
+    "What policy change is confirmed and when is it effective?"
+  ]
+}
+```
+
+### 前端拿到后建议做什么
+
+- 显示已加载哪一份 demo policy
+- 把 `sample_questions` 做成快捷按钮
+- 直接解锁 ask 输入框，不再要求手动上传
+
+## 2. 上传 policy PDF
 
 ### 请求
 
@@ -103,7 +179,7 @@ export async function uploadPolicy(caseId: string, file: File) {
 - 显示 chunk 数量
 - 自动解锁问答输入框
 
-## 2. 提问 ask API
+## 3. 提问 ask API
 
 ### 请求
 
@@ -173,6 +249,17 @@ export type UploadPolicyResponse = {
   filename: string
   chunk_count: number
   status: string
+}
+
+export type SeedDemoPolicyResponse = {
+  case_id: string
+  policy_key: string
+  default_case_id: string
+  label: string
+  filename: string
+  chunk_count: number
+  status: string
+  sample_questions: string[]
 }
 
 export type Citation = {

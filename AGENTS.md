@@ -57,6 +57,7 @@ backend/
   - Routed REST endpoints now include:
     - `POST /cases` for case creation
     - `GET /cases/{case_id}` for reading the current case snapshot, including accident JSON and cached report/chat payloads
+    - `POST /cases/{case_id}/demo/seed-policy` for seeding one of the fixed demo policy PDFs into KB-A for a chosen case id
     - `POST /cases/{case_id}/demo/seed-accident` for seeding the fixed accident/chat demo payloads into a chosen case id
     - `POST /cases/{case_id}/policy` for local policy PDF upload + KB-A indexing
     - `POST /cases/{case_id}/ask` for policy question answering with citations
@@ -71,6 +72,7 @@ backend/
   - Lightweight app-layer package for request validation, local file paths, policy upload handling, case persistence, response serialization, and FastAPI routers
   - `routers/health.py`, `routers/policy_ask.py`, and `routers/cases_and_accident.py` hold the HTTP entry points instead of `main.py`
   - `demo_seed_data.py` provides a stable accident/chat demo case payload source for scripts and teammate handoff
+  - `demo_policy_service.py` provides the stable mapping from demo policy keys and fixed demo case ids to local PDF copies + KB-A ingestion
 
 - `frontend/`
   - Minimal Next.js demo UI used for teammate integration and class demos
@@ -143,6 +145,7 @@ backend/
   - `ingest_local_policy.py`: ingests a local policy PDF into KB-A for a case
   - `query_local_rag.py`: runs a local RAG question against the vector store
   - `run_demo_eval.py`: runs the fixed local demo/eval suite against known policy PDFs and mixed KB-A + KB-B questions
+  - `seed_demo_policy.py`: seeds one of the fixed demo policy PDFs into KB-A for a chosen case id and exports a JSON summary
   - `seed_accident_demo.py`: seeds a stable accident workflow demo case, generates report/chat artifacts, and exports sample JSON for frontend/demo use
 
 ## Current Runtime Behavior
@@ -158,12 +161,14 @@ backend/
 - If the first generation pass returns a grounded fallback response, the RAG layer performs a narrower rescue pass over top snippets before giving up
 - All final answers append a fixed disclaimer
 - Demo app uploads local PDFs into `backend/.local_data/policies/<case_id>/` before indexing them into KB-A
+- `POST /cases/{case_id}/demo/seed-policy` can seed the 3 fixed demo policies without manual upload, using either the built-in demo case ids or an explicit `policy_key`
 - For short-term remote collaboration, teammates can call one shared backend over a public tunnel instead of each running their own local RAG stack
 
 ### App-layer routes
 
 - `POST /cases` creates a case row, either with a caller-provided `case_id` or a generated `case-...` ID
 - `GET /cases/{case_id}` returns the current app-layer snapshot: claim dates, stored Stage A/B JSON, and cached report/chat payloads when present
+- `POST /cases/{case_id}/demo/seed-policy` copies a stable demo PDF from `demo_policy_pdfs/` into local policy storage, ingests it into KB-A, and returns sample questions for that document
 - `POST /cases/{case_id}/demo/seed-accident` populates a stable accident demo case and returns seeded snapshot/report/chat sample data for frontend/demo use
 - `POST /cases/{case_id}/policy` and `POST /cases/{case_id}/ask` now call `ensure_case(...)`, so pure RAG/demo flows do not require explicit case creation first
 - `PATCH /cases/{case_id}/accident/stage-a` and `PATCH /cases/{case_id}/accident/stage-b` deep-merge frontend JSON into stored intake state
@@ -251,6 +256,7 @@ cd backend
 ./.venv/bin/pytest
 DATABASE_URL=postgresql+psycopg://... ./.venv/bin/python scripts/index_local_kb_b.py
 DATABASE_URL=postgresql+psycopg://... ./.venv/bin/python scripts/query_local_rag.py "What is the 15-day claim acknowledgment rule?"
+DATABASE_URL=postgresql+psycopg://... ./.venv/bin/python scripts/seed_demo_policy.py --case-id allstate-change-2025-05
 ```
 
 If `.venv` does not exist yet:
@@ -289,6 +295,7 @@ Use `backend/.env.example` as the template. Current variables:
 - Real-DB integration tests can be run with `DATABASE_URL=... ./.venv/bin/pytest -m integration`
 - Local KB-B indexing requires both a working `DATABASE_URL` and an `OPENAI_API_KEY` with available quota
 - The local demo/eval suite can be run with `DATABASE_URL=... OPENAI_API_KEY=... ./.venv/bin/python scripts/run_demo_eval.py`
+- The policy demo seed helper can be run with `DATABASE_URL=... OPENAI_API_KEY=... ./.venv/bin/python scripts/seed_demo_policy.py --case-id allstate-change-2025-05`
 - A short-term remote sharing workflow is documented in `docs/REMOTE_SHARED_BACKEND_ZH.md`, and `backend/scripts/run_shared_backend.sh` can be used to expose the local backend through ngrok for teammates
 - The second product pillar contract is documented in `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
 

@@ -14,6 +14,13 @@
 
 这 3 份 demo policy PDF 现在统一放在仓库根目录的 `demo_policy_pdfs/`，和 `claimmate_rag_docs/` 分开，避免被误当成 KB-B 法规资料一起索引。
 
+如果你不想每次手动上传 PDF，现在也可以直接用：
+
+- `POST /cases/{case_id}/demo/seed-policy`
+- `backend/scripts/seed_demo_policy.py`
+
+对于这 3 个固定 `case_id`，route 可以直接空 body 调用；如果想把固定 demo PDF 种到自定义 `case_id`，再显式传 `policy_key`。
+
 ## 固定 demo 顺序
 
 推荐现场演示顺序：
@@ -100,6 +107,13 @@ python scripts/run_demo_eval.py --json-out /tmp/claimmate_demo_eval.json
 - 脚本仍然需要可用的 `DATABASE_URL` 和有额度的 `OPENAI_API_KEY`；现在如果缺数据库配置或 OpenAI quota 不足，会给出可读错误，而不是直接抛长 traceback
 
 如果 `9/9 passed`，说明当前 demo 题集还是稳定的。
+
+如果你只是想现场快速把某个 demo case 准备好，也可以直接跑：
+
+```bash
+cd backend
+./.venv/bin/python scripts/seed_demo_policy.py --case-id allstate-change-2025-05
+```
 
 ## Citation 展示建议
 

@@ -91,7 +91,7 @@ curl http://127.0.0.1:8000/health
 }
 ```
 
-## 5. 上传一份 policy PDF
+## 5. 先用固定 demo policy，或手动上传 PDF
 
 仓库里自带的 3 份 demo policy PDF 放在：
 
@@ -99,7 +99,28 @@ curl http://127.0.0.1:8000/health
 demo_policy_pdfs/
 ```
 
-如果你只是想快速演示，也可以直接从这里挑一份上传。
+如果你只是想快速演示，最省事的是直接调用内建 seed route：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/cases/allstate-change-2025-05/demo/seed-policy"
+```
+
+如果你想把某一份固定 demo PDF 种到自定义 `case_id`，可以显式传 `policy_key`：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/cases/demo-policy-case/demo/seed-policy" \
+  -H "Content-Type: application/json" \
+  -d '{"policy_key":"progressive-verification"}'
+```
+
+也可以本地直接跑脚本：
+
+```bash
+cd backend
+./.venv/bin/python scripts/seed_demo_policy.py --case-id allstate-change-2025-05
+```
+
+如果你想手动上传真实文件，也可以继续这样做：
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/cases/demo-case/policy" \
@@ -120,7 +141,7 @@ curl -X POST "http://127.0.0.1:8000/cases/demo-case/policy" \
 ## 6. 问一个问题
 
 ```bash
-curl -X POST "http://127.0.0.1:8000/cases/demo-case/ask" \
+curl -X POST "http://127.0.0.1:8000/cases/allstate-change-2025-05/ask" \
   -H "Content-Type: application/json" \
   -d '{"question":"Who are the policyholders and what is the policy number?"}'
 ```
@@ -196,6 +217,7 @@ Ke 的接口契约在：
 2. OpenAI key 可用
 3. 数据库连接正常
 4. 你问的是当前 demo 文档里真实能答的问题
+5. 如果你走的是固定 demo case，先确认已经调用过 `/cases/{case_id}/demo/seed-policy`
 
 ## 11. 远程共享给队友
 

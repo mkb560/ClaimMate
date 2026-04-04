@@ -65,6 +65,83 @@ def test_upload_policy_endpoint_indexes_pdf(monkeypatch, tmp_path: Path) -> None
     assert saved_path.read_bytes() == b"%PDF-1.4 demo pdf bytes"
 
 
+def test_seed_policy_demo_endpoint_returns_seeded_payload(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import policy_ask
+
+    async def fake_seed_demo_policy(case_id: str, policy_key: str | None = None):
+        assert case_id == "allstate-change-2025-05"
+        assert policy_key is None
+        return {
+            "case_id": case_id,
+            "policy_key": "allstate-change",
+            "default_case_id": "allstate-change-2025-05",
+            "label": "Allstate policy change packet",
+            "filename": "TEMP_PDF_FILE.pdf",
+            "chunk_count": 6,
+            "status": "indexed",
+            "sample_questions": [
+                "Who are the policyholders and what is the policy number?",
+            ],
+        }
+
+    monkeypatch.setattr(policy_ask, "seed_demo_policy", fake_seed_demo_policy)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post("/cases/allstate-change-2025-05/demo/seed-policy")
+
+    assert response.status_code == 200
+    assert response.json()["policy_key"] == "allstate-change"
+    assert response.json()["chunk_count"] == 6
+
+
+def test_seed_policy_demo_endpoint_accepts_policy_key_body(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import policy_ask
+
+    async def fake_seed_demo_policy(case_id: str, policy_key: str | None = None):
+        assert case_id == "custom-demo-case"
+        assert policy_key == "progressive-verification"
+        return {
+            "case_id": case_id,
+            "policy_key": "progressive-verification",
+            "default_case_id": "progressive-verification-2026-03",
+            "label": "Progressive verification letter",
+            "filename": "Verification of Insurance.pdf",
+            "chunk_count": 5,
+            "status": "indexed",
+            "sample_questions": [],
+        }
+
+    monkeypatch.setattr(policy_ask, "seed_demo_policy", fake_seed_demo_policy)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/custom-demo-case/demo/seed-policy",
+            json={"policy_key": "progressive-verification"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["default_case_id"] == "progressive-verification-2026-03"
+
+
+def test_seed_policy_demo_endpoint_rejects_unknown_policy_key(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import policy_ask
+
+    async def fake_seed_demo_policy(case_id: str, policy_key: str | None = None):
+        raise KeyError(policy_key)
+
+    monkeypatch.setattr(policy_ask, "seed_demo_policy", fake_seed_demo_policy)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/custom-demo-case/demo/seed-policy",
+            json={"policy_key": "missing-policy"},
+        )
+
+    assert response.status_code == 400
+    assert "Unknown policy_key: missing-policy" in response.json()["detail"]
+    assert "allstate-change" in response.json()["detail"]
+
+
 def test_ask_endpoint_returns_answer_and_citations(monkeypatch, tmp_path: Path) -> None:
     from app.routers import policy_ask
 

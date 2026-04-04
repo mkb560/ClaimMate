@@ -46,6 +46,7 @@
 - **路由分层**：`main.py` 负责应用组装；具体接口在 `backend/app/routers/`  
 - **Policy + Ask（前端 demo 主路径）**  
   - `GET /health`  
+  - `POST /cases/{case_id}/demo/seed-policy`
   - `POST /cases/{case_id}/policy`（`multipart/form-data`，字段名 `file`）  
   - `POST /cases/{case_id}/ask`（JSON `question`）  
 - **事故流程 API**  
@@ -66,6 +67,7 @@
 
 - 单元测试：`cd backend && pytest`（大量逻辑 mock，不强制本机 Postgres）  
 - 可选集成测试：`pytest -m integration`，需真实 `DATABASE_URL`（Postgres + pgvector），见 `backend/tests/test_integration_cases_db.py`  
+- demo policy seed：`python scripts/seed_demo_policy.py --case-id allstate-change-2025-05`，会把固定 demo PDF 索引进 KB-A  
 - 远程共享本机后端：`backend/scripts/run_shared_backend.sh`，说明见 [`REMOTE_SHARED_BACKEND_ZH.md`](REMOTE_SHARED_BACKEND_ZH.md)
 
 ### 5. 文档与前端对接说明
@@ -113,7 +115,7 @@ ClaimMate/
 │   ├── app/                    # 应用层：case 服务、校验、路由子包 routers/
 │   ├── models/                 # 共享模型：accident_types、ai_types、case_orm 等
 │   ├── tests/                  # pytest（含 integration 标记用例）
-│   ├── scripts/                # 索引、demo、共享后端等脚本
+│   ├── scripts/                # 索引、demo seed、共享后端等脚本
 │   └── .local_data/            # 本地上传 policy 等（通常不提交大文件）
 ├── frontend/                   # Next.js demo UI：policy、snapshot、report、chat response 预览
 ├── claimmate_rag_docs/         # KB-B 法规/参考语料

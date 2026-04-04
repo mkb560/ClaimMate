@@ -66,6 +66,7 @@ ClaimMate 的完整产品故事有三条主线：
 
 - `POST /cases`
 - `GET /cases/{case_id}`
+- `POST /cases/{case_id}/demo/seed-policy`
 - `POST /cases/{case_id}/demo/seed-accident`
 - `PATCH /cases/{case_id}/accident/stage-a`
 - `PATCH /cases/{case_id}/accident/stage-b`
@@ -82,6 +83,7 @@ ClaimMate 的完整产品故事有三条主线：
 
 RAG / demo 主路径：
 
+- `POST /cases/{case_id}/demo/seed-policy`
 - `POST /cases/{case_id}/policy`
 - `POST /cases/{case_id}/ask`
 
@@ -125,6 +127,7 @@ RAG / demo 主路径：
 仓库里已经提供：
 
 - `backend/scripts/run_shared_backend.sh`
+- `backend/scripts/seed_demo_policy.py`
 - `docs/REMOTE_SHARED_BACKEND_ZH.md`
 
 它会用 `ngrok` 把你本机的 `FastAPI` 服务暴露成临时公网地址，方便 Ke 和 Lou 直接联调。
@@ -189,6 +192,18 @@ ClaimMate/
 
 仓库内自带的 demo policy PDF 样例。它们是给 KB-A / demo 用的，不应该和 `claimmate_rag_docs/` 混在一起索引。
 
+当前也已经有一条稳定的 demo seed 路径：
+
+- `POST /cases/{case_id}/demo/seed-policy`
+
+它会把固定 demo PDF 复制到本地 policy 存储目录并索引进 KB-A。对 3 个内建 demo case：
+
+- `allstate-change-2025-05`
+- `allstate-renewal-2025-08`
+- `progressive-verification-2026-03`
+
+可以直接用对应 `case_id` 调用，不需要再手动上传 PDF。
+
 ### `docs/`
 
 项目文档、联调说明、协作规则、demo 说明、handoff 文件都放在这里。
@@ -250,15 +265,25 @@ cd backend
 curl http://127.0.0.1:8000/health
 ```
 
-### 6. 上传保单并提问
+### 6. Seed demo 保单或手动上传后提问
 
 ```bash
+curl -X POST "http://127.0.0.1:8000/cases/allstate-change-2025-05/demo/seed-policy"
+
 curl -X POST "http://127.0.0.1:8000/cases/demo-case/policy" \
   -F "file=@/absolute/path/to/policy.pdf"
 
-curl -X POST "http://127.0.0.1:8000/cases/demo-case/ask" \
+curl -X POST "http://127.0.0.1:8000/cases/allstate-change-2025-05/ask" \
   -H "Content-Type: application/json" \
   -d '{"question":"Who are the policyholders and what is the policy number?"}'
+```
+
+如果你想把某个固定 demo PDF 种到自定义 `case_id`，也可以显式传 `policy_key`：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/cases/demo-policy-case/demo/seed-policy" \
+  -H "Content-Type: application/json" \
+  -d '{"policy_key":"progressive-verification"}'
 ```
 
 更完整的本地 demo 运行方式见：
