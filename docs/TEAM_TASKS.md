@@ -47,10 +47,6 @@
 - Ke：补 seeded demo data、启动说明、最小 case lifecycle
 - Lou：打磨 UX copy、截图、演示路径和页面转场
 
-### Ke（后端）与 Phase 2 / 3 对齐说明（仓库当前状态）
-
-- **Phase 2（Ke）**：已实现基于表 `case_chat_messages` 的 **message persistence**；`POST /cases/{case_id}/chat/event` 与简化版 `POST /cases/{case_id}/chat/messages` 在走 `handle_chat_event` 时写入用户行与（若有）AI 行；`GET /cases/{case_id}/chat/messages` 供时间线展示；`GET /cases/{case_id}` 增加 **`room_bootstrap`**，用事故报告生成的 `chat_context` 衔接「报告摘要 ↔ 聊天初始上下文」。**不含**完整 WebSocket 房间实现（仍为 HTTP + 落库原型）。
-- **Phase 3（Ke）**：**Seeded demo**（`GET /demo/policies`、`POST …/demo/seed-policy`、`POST …/demo/seed-accident`）与 **`scripts/run_demo_smoke.py`** 以 Mingtao 合入版本为准；**启动说明**以根目录 `README.md`、`docs/RUN_DEMO_ZH.md` 为准；**最小 case lifecycle** 由 **`DELETE /cases/{case_id}`** 与 `docs/BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md` / `docs/PROJECT_PROGRESS_AND_STRUCTURE.md` 中的流程描述补齐。
 
 ## 高协调文件
 
