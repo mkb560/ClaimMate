@@ -71,8 +71,13 @@ Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/a
 | Method  | Path                           | Purpose                                                                                         |
 | ------- | ------------------------------ | ----------------------------------------------------------------------------------------------- |
 | `PATCH` | `/cases/{case_id}/claim-dates` | Update claim dates; clears `**last_deadline_alert_at`** for deadline alerts                     |
-| `POST`  | `/cases/{case_id}/chat/event`  | Body maps to `**ChatEvent**` → `**handle_chat_event**`; response may be `null` or an AI payload |
+| `POST`  | `/cases/{case_id}/chat/event`  | Full `**ChatEvent**` → `**handle_chat_event**`. **Persists** user lines (when `trigger` is `MESSAGE` and text non-empty) and AI lines when the model returns a payload. |
+| `GET`   | `/cases/{case_id}/chat/messages` | Chat timeline: query `limit` (1–500, default 100), `offset`. Items include `message_type` `user` \| `ai`, `body_text`, optional `ai_payload` (citations/trigger). |
+| `POST`  | `/cases/{case_id}/chat/messages` | **Lou-friendly:** JSON `{"message_text": "...", "sender_role": "owner", "invite_sent": false, "participants": null}`. Defaults to a single owner participant (stage 1). Put **`@AI`** in `message_text` to trigger the same mention path as the AI core. |
+| `DELETE`| `/cases/{case_id}` | **204** — removes the case row, all persisted chat lines for that case, and **KB-A** vector chunks for that `case_id` (demo reset / minimal lifecycle). **404** if case missing. |
 
+
+- `**GET /cases/{case_id}**` snapshot includes `**room_bootstrap**` when `chat_context_json` exists: trimmed fields (`pinned_document_title`, `summary`, `key_facts`, `follow_up_items`, `party_comparison_rows`, `generated_at`) so the UI can seed a “room” without re-parsing the full report payload.
 
 ### Tests
 

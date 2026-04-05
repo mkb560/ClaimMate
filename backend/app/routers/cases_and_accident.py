@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, Body, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from ai.chat.chat_ai_service import handle_chat_event
@@ -15,6 +15,44 @@ from app import case_service
 from models.ai_types import ChatEvent, ChatEventTrigger, Participant
 
 router = APIRouter(tags=["cases"])
+
+
+async def _chat_event_dispatch(
+    case_id: str,
+    *,
+    sender_role: str,
+    message_text: str,
+    participants: list[Participant],
+    invite_sent: bool,
+    trigger: ChatEventTrigger,
+    metadata: dict[str, Any],
+    occurred_at: datetime | None = None,
+) -> dict[str, Any] | None:
+    event = ChatEvent(
+        case_id=case_id,
+        sender_role=sender_role,
+        message_text=message_text,
+        participants=participants,
+        invite_sent=invite_sent,
+        trigger=trigger,
+        metadata=dict(metadata),
+        occurred_at=occurred_at,
+    )
+    if trigger == ChatEventTrigger.MESSAGE and message_text.strip():
+        merged_meta = dict(metadata)
+        merged_meta.setdefault("chat_event_trigger", trigger.value)
+        await case_service.append_chat_user_message(
+            case_id,
+            sender_role,
+            message_text.strip(),
+            metadata=merged_meta,
+        )
+    response = await handle_chat_event(event)
+    if response is None:
+        return None
+    payload = ai_response_to_dict(response)
+    await case_service.append_chat_ai_message(case_id, payload)
+    return payload
 
 
 class CreateCaseBody(BaseModel):
@@ -39,6 +77,15 @@ class ChatEventBody(BaseModel):
     trigger: ChatEventTrigger
     metadata: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime | None = None
+
+
+class ChatMessageSimpleBody(BaseModel):
+    """Lou-friendly POST: default participants = single owner (stage 1). Use @AI in message_text for mentions."""
+
+    message_text: str = Field(min_length=1, max_length=8000)
+    sender_role: str = "owner"
+    invite_sent: bool = False
+    participants: list[ParticipantIn] | None = None
 
 
 @router.post("/cases", status_code=201)
@@ -149,6 +196,44 @@ async def patch_claim_dates(case_id: str, request: Request, body: ClaimDatesBody
     }
 
 
+@router.get("/cases/{case_id}/chat/messages")
+async def list_case_chat_messages(
+    case_id: str,
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    ensure_db_ready(request)
+    normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    messages = await case_service.list_chat_messages(normalized, limit=limit, offset=offset)
+    return {"case_id": normalized, "messages": messages, "limit": limit, "offset": offset}
+
+
+@router.post("/cases/{case_id}/chat/messages")
+async def post_case_chat_message(case_id: str, request: Request, body: ChatMessageSimpleBody) -> dict[str, object]:
+    ensure_ai_ready(request)
+    normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    parts = body.participants or [ParticipantIn(user_id="owner-1", role="owner")]
+    participants = [Participant(user_id=p.user_id, role=p.role) for p in parts]
+    result = await _chat_event_dispatch(
+        normalized,
+        sender_role=body.sender_role,
+        message_text=body.message_text.strip(),
+        participants=participants,
+        invite_sent=body.invite_sent,
+        trigger=ChatEventTrigger.MESSAGE,
+        metadata={"source": "post_chat_messages"},
+        occurred_at=None,
+    )
+    return {"case_id": normalized, "response": result}
+
+
 @router.post("/cases/{case_id}/chat/event")
 async def chat_event(case_id: str, request: Request, body: ChatEventBody) -> dict[str, object]:
     ensure_ai_ready(request)
@@ -157,8 +242,8 @@ async def chat_event(case_id: str, request: Request, body: ChatEventBody) -> dic
     if row is None:
         raise HTTPException(status_code=404, detail="Case not found.")
 
-    event = ChatEvent(
-        case_id=normalized,
+    result = await _chat_event_dispatch(
+        normalized,
         sender_role=body.sender_role,
         message_text=body.message_text,
         participants=[Participant(user_id=p.user_id, role=p.role) for p in body.participants],
@@ -167,7 +252,14 @@ async def chat_event(case_id: str, request: Request, body: ChatEventBody) -> dic
         metadata=body.metadata,
         occurred_at=body.occurred_at,
     )
-    response = await handle_chat_event(event)
-    if response is None:
-        return {"case_id": normalized, "response": None}
-    return {"case_id": normalized, "response": ai_response_to_dict(response)}
+    return {"case_id": normalized, "response": result}
+
+
+@router.delete("/cases/{case_id}", status_code=204)
+async def delete_case_endpoint(case_id: str, request: Request) -> Response:
+    ensure_db_ready(request)
+    normalized = validate_case_id(case_id)
+    deleted = await case_service.delete_case_and_related_data(normalized)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    return Response(status_code=204)

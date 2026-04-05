@@ -47,6 +47,7 @@
 - Ke：补 seeded demo data、启动说明、最小 case lifecycle
 - Lou：打磨 UX copy、截图、演示路径和页面转场
 
+
 ## 高协调文件
 
 - `backend/main.py`
