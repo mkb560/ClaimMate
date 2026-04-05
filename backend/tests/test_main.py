@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
-from models.ai_types import AnswerResponse, Citation
+from models.ai_types import AIResponse, AITrigger, AnswerResponse, Citation, ChatEventTrigger
 from models.case_orm import CaseRow
 
 
@@ -19,18 +19,35 @@ class _DummyEngine:
 
 
 def _build_client(monkeypatch, tmp_path: Path) -> TestClient:
-    import main
+    """Build TestClient with stable CORS: regex must allow any localhost port.
+
+    ``CORSMiddleware`` reads config at import time. A local ``.env`` that clears
+    ``CORS_ALLOW_ORIGIN_REGEX`` would otherwise make preflight return 400 for e.g.
+    ``http://localhost:4321`` (not in the static allow_origins list).
+    """
+    import importlib
+
+    import ai.config as cfg_mod
+    import main as main_mod
+
+    monkeypatch.setenv(
+        "CORS_ALLOW_ORIGIN_REGEX",
+        r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    )
+    cfg_mod.get_ai_config.cache_clear()
+    importlib.reload(cfg_mod)
+    importlib.reload(main_mod)
 
     async def fake_bootstrap(engine) -> None:
         return None
 
-    monkeypatch.setattr(main.ai_config, "database_url", "postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate")
-    monkeypatch.setattr(main.ai_config, "openai_api_key", "test-key")
+    monkeypatch.setattr(main_mod.ai_config, "database_url", "postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate")
+    monkeypatch.setattr(main_mod.ai_config, "openai_api_key", "test-key")
     monkeypatch.setattr("app.paths.LOCAL_POLICY_STORAGE_ROOT", tmp_path)
     monkeypatch.setattr("app.case_service.ensure_case", AsyncMock(return_value=None))
-    monkeypatch.setattr(main, "create_ai_engine", lambda: _DummyEngine())
-    monkeypatch.setattr(main, "bootstrap_vector_store", fake_bootstrap)
-    return TestClient(main.app)
+    monkeypatch.setattr(main_mod, "create_ai_engine", lambda: _DummyEngine())
+    monkeypatch.setattr(main_mod, "bootstrap_vector_store", fake_bootstrap)
+    return TestClient(main_mod.app)
 
 
 def test_upload_policy_endpoint_indexes_pdf(monkeypatch, tmp_path: Path) -> None:
@@ -307,6 +324,14 @@ def test_get_case_snapshot_returns_stored_case_state(monkeypatch, tmp_path: Path
             "case_id": "demo-case",
             "pinned_document_title": "ClaimMate Accident Report - demo-case",
         },
+        "room_bootstrap": {
+            "pinned_document_title": "ClaimMate Accident Report - demo-case",
+            "summary": None,
+            "key_facts": [],
+            "follow_up_items": [],
+            "party_comparison_rows": [],
+            "generated_at": None,
+        },
         "created_at": "2026-04-03T10:00:00+00:00",
         "updated_at": "2026-04-03T11:30:00+00:00",
     }
@@ -358,6 +383,184 @@ def test_seed_accident_demo_endpoint_returns_seeded_payload(monkeypatch, tmp_pat
     assert response.status_code == 200
     assert response.json()["case_id"] == "demo-accident-2026-04"
     assert response.json()["sample_chat_responses"]["claim_rule_stage_3"]["trigger"] == "MENTION"
+
+
+def test_chat_event_persists_user_and_ai_when_model_responds(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
+    append_user = AsyncMock()
+    append_ai = AsyncMock()
+    monkeypatch.setattr(cases_and_accident.case_service, "append_chat_user_message", append_user)
+    monkeypatch.setattr(cases_and_accident.case_service, "append_chat_ai_message", append_ai)
+
+    async def fake_handle(event):
+        assert event.case_id == "demo-case"
+        return AIResponse(text="Answer", citations=[], trigger=AITrigger.MENTION, metadata={})
+
+    monkeypatch.setattr(cases_and_accident, "handle_chat_event", fake_handle)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/demo-case/chat/event",
+            json={
+                "sender_role": "owner",
+                "message_text": "@AI What is the deductible?",
+                "participants": [{"user_id": "o1", "role": "owner"}],
+                "invite_sent": False,
+                "trigger": ChatEventTrigger.MESSAGE.value,
+                "metadata": {},
+            },
+        )
+
+    assert response.status_code == 200
+    append_user.assert_awaited_once()
+    append_ai.assert_awaited_once()
+    assert response.json()["response"]["text"] == "Answer"
+
+
+def test_chat_event_skips_ai_append_when_no_response(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
+    append_user = AsyncMock()
+    append_ai = AsyncMock()
+    monkeypatch.setattr(cases_and_accident.case_service, "append_chat_user_message", append_user)
+    monkeypatch.setattr(cases_and_accident.case_service, "append_chat_ai_message", append_ai)
+    monkeypatch.setattr(cases_and_accident, "handle_chat_event", AsyncMock(return_value=None))
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/demo-case/chat/event",
+            json={
+                "sender_role": "owner",
+                "message_text": "No AI mention here",
+                "participants": [{"user_id": "o1", "role": "owner"}],
+                "invite_sent": False,
+                "trigger": ChatEventTrigger.MESSAGE.value,
+                "metadata": {},
+            },
+        )
+
+    assert response.status_code == 200
+    append_user.assert_awaited_once()
+    append_ai.assert_not_called()
+    assert response.json()["response"] is None
+
+
+def test_get_chat_messages_returns_list(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
+    monkeypatch.setattr(
+        cases_and_accident.case_service,
+        "list_chat_messages",
+        AsyncMock(return_value=[{"id": "m1", "message_type": "user", "body_text": "hi"}]),
+    )
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.get("/cases/demo-case/chat/messages")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["case_id"] == "demo-case"
+    assert body["messages"][0]["body_text"] == "hi"
+
+
+def test_post_chat_messages_triggers_dispatch(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
+    monkeypatch.setattr(cases_and_accident.case_service, "append_chat_user_message", AsyncMock())
+    monkeypatch.setattr(cases_and_accident.case_service, "append_chat_ai_message", AsyncMock())
+    monkeypatch.setattr(
+        cases_and_accident,
+        "handle_chat_event",
+        AsyncMock(return_value=AIResponse(text="Simple", citations=[], trigger=AITrigger.MENTION, metadata={})),
+    )
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/demo-case/chat/messages",
+            json={"message_text": "@AI test"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["response"]["text"] == "Simple"
+
+
+def test_delete_case_returns_204(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    monkeypatch.setattr(cases_and_accident.case_service, "delete_case_and_related_data", AsyncMock(return_value=True))
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.delete("/cases/demo-case")
+
+    assert response.status_code == 204
+
+
+def test_delete_case_missing_returns_404(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    monkeypatch.setattr(cases_and_accident.case_service, "delete_case_and_related_data", AsyncMock(return_value=False))
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.delete("/cases/missing-case")
+
+    assert response.status_code == 404
 
 
 def test_cors_headers_allow_local_frontend_origin(monkeypatch, tmp_path: Path) -> None:

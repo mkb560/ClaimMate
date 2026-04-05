@@ -12,16 +12,10 @@ marked test later.
 
 from __future__ import annotations
 
-import asyncio
-import uuid
-
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
 
 from ai.config import ai_config
-from ai.ingestion.vector_store import VectorDocument, get_sessionmaker
-from models.case_orm import CaseRow
 
 import main
 
@@ -44,14 +38,6 @@ def integration_client() -> TestClient:
         if err:
             pytest.skip(f"AI bootstrap failed against DATABASE_URL: {err}")
         yield client
-
-
-async def _cleanup_case(case_id: str) -> None:
-    sm = get_sessionmaker()
-    async with sm() as session:
-        await session.execute(delete(VectorDocument).where(VectorDocument.case_id == case_id))
-        await session.execute(delete(CaseRow).where(CaseRow.id == case_id))
-        await session.commit()
 
 
 def test_health_db_bootstrap_ok(integration_client: TestClient) -> None:
@@ -125,6 +111,10 @@ def test_case_and_accident_report_round_trip(integration_client: TestClient) -> 
         assert snapshot["report_payload"]["case_id"] == created
         assert snapshot["chat_context"]["case_id"] == created
         assert snapshot["claim_notice_at"] == "2026-03-28T10:00:00+00:00"
+        rb = snapshot.get("room_bootstrap")
+        assert rb is not None
+        assert rb.get("pinned_document_title") is not None
     finally:
         if created is not None:
-            asyncio.run(_cleanup_case(created))
+            dr = integration_client.delete(f"/cases/{created}")
+            assert dr.status_code == 204

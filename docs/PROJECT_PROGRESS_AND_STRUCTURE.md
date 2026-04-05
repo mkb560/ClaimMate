@@ -61,7 +61,11 @@
   - `GET /cases/{case_id}/accident/report`  
 - **索赔日期与聊天入口**  
   - `PATCH /cases/{case_id}/claim-dates`  
-  - `POST /cases/{case_id}/chat/event` → `handle_chat_event`  
+  - `POST /cases/{case_id}/chat/event` → `handle_chat_event`（落库用户/AI 消息行）  
+  - `GET /cases/{case_id}/chat/messages`、`POST /cases/{case_id}/chat/messages`（简化 `@AI` 发帖）  
+  - `DELETE /cases/{case_id}` — 删除 case、聊天记录、该 case 的 KB-A 向量（最小 lifecycle / demo 重置）  
+
+`GET /cases/{case_id}` 的 snapshot 含 **`room_bootstrap`**（来自事故报告写入的 `chat_context`），便于聊天区展示与 pinned 上下文。
 
 **说明：** 上传的 PDF 会落在本地 `backend/.local_data/policies/{case_id}/`（便于开发与调试）。
 

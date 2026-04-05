@@ -4,8 +4,8 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, String, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import DateTime, String, Text, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -34,6 +34,21 @@ class CaseRow(CaseBase):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CaseChatMessageRow(CaseBase):
+    """Append-only chat lines for a case (demo / product-lite persistence)."""
+
+    __tablename__ = "case_chat_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    case_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    sender_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    message_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    body_text: Mapped[str] = mapped_column(Text, nullable=False)
+    ai_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 def generate_case_id() -> str:
