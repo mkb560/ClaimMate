@@ -147,7 +147,7 @@ backend/
   - `ingest_local_policy.py`: ingests a local policy PDF into KB-A for a case
   - `query_local_rag.py`: runs a local RAG question against the vector store
   - `run_demo_eval.py`: runs the fixed local demo/eval suite against known policy PDFs and mixed KB-A + KB-B questions
-  - `run_demo_smoke.py`: runs the end-to-end HTTP smoke path over a live backend (`health -> demo/policies -> seed-policy -> ask -> seed-accident -> chat/event`)
+  - `run_demo_smoke.py`: runs the end-to-end HTTP smoke path over a live backend (`health -> demo/policies -> seed-policy -> ask -> seed-accident -> case snapshot(room_bootstrap) -> chat/messages -> chat/event`)
   - `seed_demo_policy.py`: seeds one of the fixed demo policy PDFs into KB-A for a chosen case id and exports a JSON summary
   - `seed_accident_demo.py`: seeds a stable accident workflow demo case, generates report/chat artifacts, and exports sample JSON for frontend/demo use
 
@@ -171,6 +171,7 @@ backend/
 
 - `POST /cases` creates a case row, either with a caller-provided `case_id` or a generated `case-...` ID
 - `GET /cases/{case_id}` returns the current app-layer snapshot: claim dates, stored Stage A/B JSON, and cached report/chat payloads when present
+- `GET /cases/{case_id}` snapshot now also includes `room_bootstrap` when `chat_context_json` exists, so the frontend can seed a chat room or pinned summary without re-parsing the full report payload
 - `GET /demo/policies` returns the 3 built-in demo policies, their default case ids, filenames, labels, and sample questions
 - `GET /cases/{case_id}/policy` returns whether KB-A policy chunks exist for that case, the indexed filename/source label, chunk count, and matched demo policy metadata when applicable
 - `POST /cases/{case_id}/demo/seed-policy` copies a stable demo PDF from `demo_policy_pdfs/` into local policy storage, ingests it into KB-A, and returns sample questions for that document
@@ -180,7 +181,10 @@ backend/
 - `POST /cases/{case_id}/accident/report` materializes the deterministic accident report payload and cached chat context into the `cases` row
 - `GET /cases/{case_id}/accident/report` returns the stored report/chat context and reports a 404 if a report has not been generated yet
 - `PATCH /cases/{case_id}/claim-dates` updates deadline fields and clears `last_deadline_alert_at`
+- `GET /cases/{case_id}/chat/messages` returns the append-only chat timeline from `case_chat_messages`
+- `POST /cases/{case_id}/chat/messages` writes a user message row and, when AI responds, an AI row, while using a Lou-friendly simplified payload shape
 - `POST /cases/{case_id}/chat/event` maps the request into `models.ai_types.ChatEvent` and returns either serialized AI output or `null`
+- `DELETE /cases/{case_id}` deletes the case row plus related vector and chat-message data for demo cleanup
 
 ### Chat AI
 
@@ -194,6 +198,7 @@ backend/
   - keyword-triggered dispute escalation
   - fallback deadline reminder checks
 - Stage 3 answers are prefixed with `For reference:` to keep the tone neutral in multi-party chat
+- `POST /cases/{case_id}/chat/event` and `POST /cases/{case_id}/chat/messages` now persist user and AI rows into `case_chat_messages` for simple timeline rendering
 
 ### Accident workflow contract
 

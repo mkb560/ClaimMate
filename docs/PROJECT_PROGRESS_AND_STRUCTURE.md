@@ -74,7 +74,7 @@
 - 单元测试：`cd backend && pytest`（大量逻辑 mock，不强制本机 Postgres）  
 - 可选集成测试：`pytest -m integration`，需真实 `DATABASE_URL`（Postgres + pgvector），见 `backend/tests/test_integration_cases_db.py`  
 - demo policy seed：`python scripts/seed_demo_policy.py --case-id allstate-change-2025-05`，会把固定 demo PDF 索引进 KB-A  
-- end-to-end smoke：`python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000`，会按真实 HTTP 路径跑 `health -> demo/policies -> seed-policy -> ask -> seed-accident -> chat/event`  
+- end-to-end smoke：`python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000`，会按真实 HTTP 路径跑 `health -> demo/policies -> seed-policy -> ask -> seed-accident -> room_bootstrap -> chat/messages -> chat/event`  
 - 远程共享本机后端：`backend/scripts/run_shared_backend.sh`，说明见 [`REMOTE_SHARED_BACKEND_ZH.md`](REMOTE_SHARED_BACKEND_ZH.md)
 
 ### 5. 文档与前端对接说明

@@ -308,7 +308,7 @@ curl -X POST "http://127.0.0.1:8000/cases/demo-policy-case/demo/seed-policy" \
 
 ### 6.5. 一键跑完整 smoke flow
 
-如果你想确认当前后端从 `health -> demo/policies -> seed-policy -> ask -> seed-accident -> chat/event` 这条整链都还是通的，可以直接跑：
+如果你想确认当前后端从 `health -> demo/policies -> seed-policy -> ask -> seed-accident -> case snapshot(room_bootstrap) -> chat/messages -> chat/event` 这条整链都还是通的，可以直接跑：
 
 ```bash
 cd backend

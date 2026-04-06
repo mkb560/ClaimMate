@@ -168,6 +168,19 @@ def _validate_seed_accident(payload: dict[str, Any], plan: SmokePlan) -> None:
         raise ValueError("seed-accident response did not include case_snapshot.")
 
 
+def _validate_case_snapshot(payload: dict[str, Any], plan: SmokePlan) -> None:
+    if payload.get("case_id") != plan.accident_case_id:
+        raise ValueError(f"case snapshot mismatch: {payload.get('case_id')!r}")
+    room_bootstrap = payload.get("room_bootstrap")
+    if not isinstance(room_bootstrap, dict) or not room_bootstrap:
+        raise ValueError("case snapshot did not include room_bootstrap.")
+    pinned_title = room_bootstrap.get("pinned_document_title")
+    if not isinstance(pinned_title, str) or not pinned_title.strip():
+        raise ValueError("room_bootstrap did not include pinned_document_title.")
+    if not isinstance(room_bootstrap.get("key_facts"), list):
+        raise ValueError("room_bootstrap did not include key_facts list.")
+
+
 def _validate_chat_response(payload: dict[str, Any], plan: SmokePlan) -> None:
     if payload.get("case_id") != plan.accident_case_id:
         raise ValueError(f"chat/event case_id mismatch: {payload.get('case_id')!r}")
@@ -179,6 +192,58 @@ def _validate_chat_response(payload: dict[str, Any], plan: SmokePlan) -> None:
         raise ValueError("chat/event response text is empty.")
     if plan.chat_label.endswith("stage_3") and not text.startswith("For reference:"):
         raise ValueError("stage_3 chat response did not preserve the expected neutral prefix.")
+
+
+def _build_chat_message_body(chat_request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "message_text": chat_request["message_text"],
+        "sender_role": chat_request["sender_role"],
+        "invite_sent": chat_request["invite_sent"],
+        "participants": chat_request.get("participants"),
+    }
+
+
+def _validate_chat_messages_payload(payload: dict[str, Any], plan: SmokePlan) -> None:
+    if payload.get("case_id") != plan.accident_case_id:
+        raise ValueError(f"chat/messages case_id mismatch: {payload.get('case_id')!r}")
+    if not isinstance(payload.get("messages"), list):
+        raise ValueError("chat/messages response did not include messages list.")
+
+
+def _validate_chat_messages_growth(
+    *,
+    before_payload: dict[str, Any],
+    after_payload: dict[str, Any],
+    posted_message_text: str,
+    ai_response_text: str,
+    expected_user_metadata: dict[str, Any] | None = None,
+) -> None:
+    before_messages = before_payload.get("messages")
+    after_messages = after_payload.get("messages")
+    if not isinstance(before_messages, list) or not isinstance(after_messages, list):
+        raise ValueError("chat/messages payloads did not include message lists.")
+    if len(after_messages) < len(before_messages) + 2:
+        raise ValueError(
+            "chat/messages did not grow by at least two rows after posting a user line and AI reply."
+        )
+    last_two = after_messages[-2:]
+    if len(last_two) != 2:
+        raise ValueError("chat/messages did not include the expected trailing user and ai rows.")
+    user_row, ai_row = last_two
+    if user_row.get("message_type") != "user" or user_row.get("body_text") != posted_message_text:
+        raise ValueError("Last persisted user chat row did not match the posted message.")
+    if ai_row.get("message_type") != "ai" or ai_row.get("body_text") != ai_response_text:
+        raise ValueError("Last persisted ai chat row did not match the returned AI response.")
+    metadata = user_row.get("metadata")
+    if expected_user_metadata is not None:
+        if not isinstance(metadata, dict):
+            raise ValueError("Persisted user chat row did not include metadata.")
+        for key, value in expected_user_metadata.items():
+            if metadata.get(key) != value:
+                raise ValueError(f"Persisted user chat row did not preserve metadata[{key!r}] = {value!r}.")
+    ai_payload = ai_row.get("ai_payload")
+    if not isinstance(ai_payload, dict) or ai_payload.get("text") != ai_response_text:
+        raise ValueError("Persisted ai chat row did not preserve ai_payload text.")
 
 
 def _request_json(
@@ -326,6 +391,68 @@ def main() -> None:
         chat_payload = _pick_chat_request(accident_payload, plan.chat_label)
         _run_step(
             results,
+            name="case_snapshot",
+            request_fn=lambda: _request_json(
+                session,
+                "GET",
+                f"{plan.base_url}/cases/{plan.accident_case_id}",
+                timeout=args.timeout,
+            ),
+            validate_fn=lambda payload: _validate_case_snapshot(payload, plan),
+        )
+
+        before_messages_payload = _run_step(
+            results,
+            name="chat_messages_before",
+            request_fn=lambda: _request_json(
+                session,
+                "GET",
+                f"{plan.base_url}/cases/{plan.accident_case_id}/chat/messages",
+                timeout=args.timeout,
+            ),
+            validate_fn=lambda payload: _validate_chat_messages_payload(payload, plan),
+        )
+
+        post_message_body = _build_chat_message_body(chat_payload)
+        post_message_response = _run_step(
+            results,
+            name="chat_messages_post",
+            request_fn=lambda: _request_json(
+                session,
+                "POST",
+                f"{plan.base_url}/cases/{plan.accident_case_id}/chat/messages",
+                timeout=args.timeout,
+                json_body=post_message_body,
+            ),
+            validate_fn=lambda payload: _validate_chat_response(payload, plan),
+        )
+
+        after_post_messages_payload = _run_step(
+            results,
+            name="chat_messages_after",
+            request_fn=lambda: _request_json(
+                session,
+                "GET",
+                f"{plan.base_url}/cases/{plan.accident_case_id}/chat/messages",
+                timeout=args.timeout,
+            ),
+            validate_fn=lambda payload: (
+                _validate_chat_messages_payload(payload, plan),
+                _validate_chat_messages_growth(
+                    before_payload=before_messages_payload,
+                    after_payload=payload,
+                    posted_message_text=post_message_body["message_text"],
+                    ai_response_text=post_message_response["response"]["text"],
+                    expected_user_metadata={
+                        "source": "post_chat_messages",
+                        "chat_event_trigger": "MESSAGE",
+                    },
+                ),
+            ),
+        )
+
+        chat_event_response = _run_step(
+            results,
             name="chat_event",
             request_fn=lambda: _request_json(
                 session,
@@ -335,6 +462,30 @@ def main() -> None:
                 json_body=chat_payload,
             ),
             validate_fn=lambda payload: _validate_chat_response(payload, plan),
+        )
+
+        _run_step(
+            results,
+            name="chat_event_messages_after",
+            request_fn=lambda: _request_json(
+                session,
+                "GET",
+                f"{plan.base_url}/cases/{plan.accident_case_id}/chat/messages",
+                timeout=args.timeout,
+            ),
+            validate_fn=lambda payload: (
+                _validate_chat_messages_payload(payload, plan),
+                _validate_chat_messages_growth(
+                    before_payload=after_post_messages_payload,
+                    after_payload=payload,
+                    posted_message_text=chat_payload["message_text"],
+                    ai_response_text=chat_event_response["response"]["text"],
+                    expected_user_metadata={
+                        **dict(chat_payload.get("metadata") or {}),
+                        "chat_event_trigger": chat_payload["trigger"],
+                    },
+                ),
+            ),
         )
     finally:
         session.close()

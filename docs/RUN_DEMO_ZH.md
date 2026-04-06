@@ -195,7 +195,10 @@ cd backend
 3. `POST /cases/{case_id}/demo/seed-policy`
 4. `POST /cases/{case_id}/ask`
 5. `POST /cases/{case_id}/demo/seed-accident`
-6. `POST /cases/{case_id}/chat/event`
+6. `GET /cases/{case_id}` 并验证 `room_bootstrap`
+7. `POST /cases/{case_id}/chat/messages`
+8. `GET /cases/{case_id}/chat/messages`
+9. `POST /cases/{case_id}/chat/event`
 
 如果你想直接打 shared backend，把 `--base-url` 换成当前 ngrok URL 就行。
 

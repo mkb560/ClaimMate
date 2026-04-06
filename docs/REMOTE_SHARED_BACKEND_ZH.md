@@ -185,6 +185,12 @@ cd backend
 ./.venv/bin/python scripts/run_demo_smoke.py --base-url https://exasperatingly-unprologued-elease.ngrok-free.dev
 ```
 
+这条 smoke 现在会覆盖：
+- `GET /cases/{case_id}` 的 `room_bootstrap`
+- `POST /cases/{case_id}/chat/messages`
+- `GET /cases/{case_id}/chat/messages`
+- `POST /cases/{case_id}/chat/event`
+
 建议：
 - Ke 先按这个 base URL 接后端接口
 - Lou 先把前端 API base URL 指到这个地址，直接做 seed-policy + ask 的 happy path
