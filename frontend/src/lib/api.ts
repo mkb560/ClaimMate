@@ -161,6 +161,32 @@ export type PatchStageAResponse = {
   stage_a: Record<string, unknown>;
 };
 
+export type PatchStageBResponse = {
+  case_id: string;
+  stage_b: Record<string, unknown>;
+};
+
+export async function patchAccidentStageB(
+  caseId: string,
+  payload: Record<string, unknown>
+) {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/accident/stage-b`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Save Stage B failed");
+  }
+
+  return (await response.json()) as PatchStageBResponse;
+}
+
 export async function checkHealth() {
   const response = await fetch(`${API_BASE_URL}/health`, {
     method: "GET",
