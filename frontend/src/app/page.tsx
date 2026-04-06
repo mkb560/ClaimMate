@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   askPolicyQuestion,
   CaseSnapshotResponse,
@@ -16,6 +16,12 @@ import {
   sendChatEvent,
   seedAccidentDemoCase,
   uploadPolicy,
+  getDemoPolicies,
+  getCasePolicyStatus,
+  seedDemoPolicy,
+  DemoPolicy,
+  CasePolicyStatusResponse,
+  SeedDemoPolicyResponse,
 } from "@/lib/api";
 
 function CitationList({ citations }: { citations: Citation[] }) {
@@ -45,7 +51,11 @@ function CitationList({ citations }: { citations: Citation[] }) {
 function ComparisonTable({
   rows,
 }: {
-  rows: Array<{ field_label: string; owner_value: string; other_party_value: string }>;
+  rows: Array<{
+    field_label: string;
+    owner_value: string;
+    other_party_value: string;
+  }>;
 }) {
   if (!rows.length) return null;
 
@@ -111,23 +121,34 @@ const STAGE_3_RULE_EVENT = {
 
 export default function HomePage() {
   const [caseId, setCaseId] = useState(DEFAULT_POLICY_CASE_ID);
-  const [accidentCaseId, setAccidentCaseId] = useState(DEFAULT_ACCIDENT_CASE_ID);
+  const [accidentCaseId, setAccidentCaseId] = useState(
+    DEFAULT_ACCIDENT_CASE_ID
+  );
   const [file, setFile] = useState<File | null>(null);
   const [question, setQuestion] = useState(
     "What is the policy number, policy period, and insurer?"
   );
-  const [chatMessage, setChatMessage] = useState(STAGE_3_RULE_EVENT.message_text);
+  const [chatMessage, setChatMessage] = useState(
+    STAGE_3_RULE_EVENT.message_text
+  );
 
   const [healthResult, setHealthResult] = useState<string>("");
   const [uploadResult, setUploadResult] =
     useState<UploadPolicyResponse | null>(null);
   const [askResult, setAskResult] = useState<AskResponse | null>(null);
-  const [caseSnapshot, setCaseSnapshot] = useState<CaseSnapshotResponse | null>(null);
+  const [caseSnapshot, setCaseSnapshot] =
+    useState<CaseSnapshotResponse | null>(null);
   const [reportResult, setReportResult] = useState<{
     report_payload: AccidentReportPayload;
     chat_context: AccidentChatContext;
   } | null>(null);
   const [chatResult, setChatResult] = useState<ChatEventResponse | null>(null);
+
+  const [demoPolicies, setDemoPolicies] = useState<DemoPolicy[]>([]);
+  const [policyStatus, setPolicyStatus] =
+    useState<CasePolicyStatusResponse | null>(null);
+  const [seedPolicyResult, setSeedPolicyResult] =
+    useState<SeedDemoPolicyResponse | null>(null);
 
   const [loadingHealth, setLoadingHealth] = useState(false);
   const [loadingUpload, setLoadingUpload] = useState(false);
@@ -137,9 +158,55 @@ export default function HomePage() {
   const [loadingChat, setLoadingChat] = useState(false);
   const [loadingSeed, setLoadingSeed] = useState(false);
 
+  const [loadingDemoPolicies, setLoadingDemoPolicies] = useState(false);
+  const [loadingPolicyStatus, setLoadingPolicyStatus] = useState(false);
+  const [loadingSeedPolicy, setLoadingSeedPolicy] = useState(false);
+
   const [error, setError] = useState("");
 
-  const canAsk = useMemo(() => !!uploadResult, [uploadResult]);
+  const canAsk = useMemo(() => {
+    return !!uploadResult || !!policyStatus?.has_policy || !!seedPolicyResult;
+  }, [uploadResult, policyStatus, seedPolicyResult]);
+
+  useEffect(() => {
+    loadDemoPolicies();
+  }, []);
+
+  useEffect(() => {
+    if (!caseId.trim()) return;
+    loadPolicyStatus(caseId);
+  }, [caseId]);
+
+  async function loadDemoPolicies() {
+    setLoadingDemoPolicies(true);
+    setError("");
+    try {
+      const result = await getDemoPolicies();
+      setDemoPolicies(result.policies);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Load demo policies failed");
+    } finally {
+      setLoadingDemoPolicies(false);
+    }
+  }
+
+  async function loadPolicyStatus(targetCaseId: string) {
+    if (!targetCaseId.trim()) return;
+
+    setLoadingPolicyStatus(true);
+    setError("");
+    try {
+      const result = await getCasePolicyStatus(targetCaseId.trim());
+      setPolicyStatus(result);
+    } catch (err) {
+      setPolicyStatus(null);
+      setError(
+        err instanceof Error ? err.message : "Load policy status failed"
+      );
+    } finally {
+      setLoadingPolicyStatus(false);
+    }
+  }
 
   async function handleHealthCheck() {
     setLoadingHealth(true);
@@ -154,6 +221,28 @@ export default function HomePage() {
     }
   }
 
+  async function handleSeedPolicy(selected: DemoPolicy) {
+    setLoadingSeedPolicy(true);
+    setError("");
+    setAskResult(null);
+    setUploadResult(null);
+    setSeedPolicyResult(null);
+
+    try {
+      setCaseId(selected.default_case_id);
+      const result = await seedDemoPolicy(selected.default_case_id);
+      setSeedPolicyResult(result);
+      setQuestion(
+        selected.sample_questions[0] || "What is the policy number?"
+      );
+      await loadPolicyStatus(selected.default_case_id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Seed demo policy failed");
+    } finally {
+      setLoadingSeedPolicy(false);
+    }
+  }
+
   async function handleUpload() {
     if (!file) return;
 
@@ -165,6 +254,8 @@ export default function HomePage() {
     try {
       const result = await uploadPolicy(caseId.trim(), file);
       setUploadResult(result);
+      setSeedPolicyResult(null);
+      await loadPolicyStatus(caseId.trim());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -180,10 +271,7 @@ export default function HomePage() {
     setAskResult(null);
 
     try {
-      const result = await askPolicyQuestion(
-        caseId.trim(),
-        question.trim()
-      );
+      const result = await askPolicyQuestion(caseId.trim(), question.trim());
       setAskResult(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ask failed");
@@ -223,7 +311,8 @@ export default function HomePage() {
         report_payload: result.report_payload,
         chat_context: result.chat_context,
       });
-      const seededStage3Response = result.sample_chat_responses.claim_rule_stage_3;
+      const seededStage3Response =
+        result.sample_chat_responses.claim_rule_stage_3;
       setChatResult(
         seededStage3Response
           ? {
@@ -233,7 +322,9 @@ export default function HomePage() {
           : null
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Seed accident demo failed");
+      setError(
+        err instanceof Error ? err.message : "Seed accident demo failed"
+      );
     } finally {
       setLoadingSeed(false);
     }
@@ -279,12 +370,11 @@ export default function HomePage() {
         <div>
           <h1 className="text-3xl font-bold">ClaimMate Demo UI</h1>
           <p className="mt-2 text-gray-600">
-            Shared backend demo for policy Q&A, accident snapshot preview, and
-            chat AI output.
+            Shared backend demo for policy Q&amp;A, accident snapshot preview,
+            and chat AI output.
           </p>
         </div>
 
-        {/* Health */}
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">1. Backend Health Check</h2>
           <button
@@ -302,9 +392,43 @@ export default function HomePage() {
           )}
         </section>
 
-        {/* Upload */}
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">2. Upload Policy PDF</h2>
+
+          <div className="mt-4">
+            <div className="flex items-center gap-3">
+              <h3 className="font-medium">Built-in Demo Policies</h3>
+              <button
+                onClick={loadDemoPolicies}
+                disabled={loadingDemoPolicies}
+                className="rounded-xl border px-3 py-1 text-sm"
+              >
+                {loadingDemoPolicies ? "Loading..." : "Refresh demo policies"}
+              </button>
+            </div>
+
+            {demoPolicies.length > 0 && (
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                {demoPolicies.map((policy) => (
+                  <button
+                    key={policy.policy_key}
+                    type="button"
+                    onClick={() => handleSeedPolicy(policy)}
+                    disabled={loadingSeedPolicy}
+                    className="rounded-xl border bg-gray-50 p-4 text-left hover:bg-gray-100"
+                  >
+                    <div className="font-medium">{policy.label}</div>
+                    <div className="mt-1 text-sm text-gray-600">
+                      {policy.filename}
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      case_id: {policy.default_case_id}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="mt-4 space-y-4">
             <input
@@ -329,21 +453,45 @@ export default function HomePage() {
             </button>
           </div>
 
+          {loadingPolicyStatus && (
+            <div className="mt-4 text-sm text-gray-500">
+              Loading policy status...
+            </div>
+          )}
+
+          {policyStatus && (
+            <div className="mt-4 rounded-xl border bg-gray-50 p-4 text-sm text-gray-700">
+              <div className="font-medium">Current Policy Status</div>
+              <div className="mt-2">
+                has_policy: {policyStatus.has_policy ? "true" : "false"}
+              </div>
+              <div>filename: {policyStatus.filename || "None"}</div>
+              <div>chunk_count: {policyStatus.chunk_count}</div>
+              <div>source_label: {policyStatus.source_label || "None"}</div>
+            </div>
+          )}
+
+          {seedPolicyResult && (
+            <div className="mt-4 rounded bg-blue-50 p-3">
+              Demo policy seeded: {seedPolicyResult.label} (
+              {seedPolicyResult.filename})
+            </div>
+          )}
+
           {uploadResult && (
-            <div className="mt-4 bg-green-50 p-3 rounded">
+            <div className="mt-4 rounded bg-green-50 p-3">
               Upload success: {uploadResult.filename}
             </div>
           )}
         </section>
 
-        {/* Ask */}
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">3. Ask Question</h2>
 
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            className="w-full border rounded p-2"
+            className="w-full rounded p-2 border"
           />
 
           <button
@@ -414,8 +562,13 @@ export default function HomePage() {
                 <h3 className="font-semibold">Case Snapshot</h3>
                 <div className="mt-2 text-sm text-gray-700">
                   <div>case_id: {caseSnapshot.case_id}</div>
-                  <div>claim_notice_at: {caseSnapshot.claim_notice_at || "Not set"}</div>
-                  <div>proof_of_claim_at: {caseSnapshot.proof_of_claim_at || "Not set"}</div>
+                  <div>
+                    claim_notice_at: {caseSnapshot.claim_notice_at || "Not set"}
+                  </div>
+                  <div>
+                    proof_of_claim_at:{" "}
+                    {caseSnapshot.proof_of_claim_at || "Not set"}
+                  </div>
                   <div>updated_at: {caseSnapshot.updated_at}</div>
                 </div>
               </div>
@@ -424,13 +577,15 @@ export default function HomePage() {
                 <div className="rounded-xl border p-4">
                   <h3 className="font-semibold">Stage A</h3>
                   <p className="mt-2 text-sm text-gray-700">
-                    {(caseSnapshot.stage_a.quick_summary as string) || "No quick summary yet."}
+                    {(caseSnapshot.stage_a.quick_summary as string) ||
+                      "No quick summary yet."}
                   </p>
                 </div>
                 <div className="rounded-xl border p-4">
                   <h3 className="font-semibold">Stage B</h3>
                   <p className="mt-2 text-sm text-gray-700">
-                    {(caseSnapshot.stage_b?.damage_summary as string) || "No damage summary yet."}
+                    {(caseSnapshot.stage_b?.damage_summary as string) ||
+                      "No damage summary yet."}
                   </p>
                 </div>
               </div>
@@ -461,7 +616,9 @@ export default function HomePage() {
                 />
               </div>
 
-              <ComparisonTable rows={reportResult.report_payload.party_comparison_rows} />
+              <ComparisonTable
+                rows={reportResult.report_payload.party_comparison_rows}
+              />
             </div>
           )}
         </section>
@@ -470,7 +627,8 @@ export default function HomePage() {
           <h2 className="text-xl font-semibold">5. Chat Event Demo</h2>
           <p className="mt-2 text-sm text-gray-600">
             Runs a stage 3 chat event against the shared backend so you can see
-            the neutral, citation-backed response shape that the frontend should render.
+            the neutral, citation-backed response shape that the frontend should
+            render.
           </p>
 
           <textarea
@@ -501,9 +659,7 @@ export default function HomePage() {
         </section>
 
         {error && (
-          <div className="bg-red-100 text-red-700 p-3 rounded">
-            {error}
-          </div>
+          <div className="rounded bg-red-100 p-3 text-red-700">{error}</div>
         )}
       </div>
     </main>

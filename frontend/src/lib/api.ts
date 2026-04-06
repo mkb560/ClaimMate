@@ -14,6 +14,38 @@ export type UploadPolicyResponse = {
   status: string;
 };
 
+export type DemoPolicy = {
+  policy_key: string;
+  default_case_id: string;
+  label: string;
+  filename: string;
+  sample_questions: string[];
+};
+
+export type DemoPolicyCatalogResponse = {
+  policies: DemoPolicy[];
+};
+
+export type SeedDemoPolicyResponse = {
+  case_id: string;
+  policy_key: string;
+  default_case_id: string;
+  label: string;
+  filename: string;
+  chunk_count: number;
+  status: string;
+  sample_questions: string[];
+};
+
+export type CasePolicyStatusResponse = {
+  case_id: string;
+  has_policy: boolean;
+  chunk_count: number;
+  source_label: string | null;
+  filename: string | null;
+  demo_policy?: DemoPolicy | null;
+};
+
 export type Citation = {
   source_type: "kb_a" | "kb_b";
   source_label: string;
@@ -138,6 +170,58 @@ export async function checkHealth() {
   }
 
   return response.json();
+}
+
+export async function getDemoPolicies() {
+  const response = await fetch(`${API_BASE_URL}/demo/policies`, {
+    method: "GET",
+    cache: "no-store",
+    headers: {
+      ...NGROK_HEADERS,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Load demo policies failed");
+  }
+
+  return (await response.json()) as DemoPolicyCatalogResponse;
+}
+
+export async function getCasePolicyStatus(caseId: string) {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/policy`, {
+    method: "GET",
+    cache: "no-store",
+    headers: {
+      ...NGROK_HEADERS,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Load case policy status failed");
+  }
+
+  return (await response.json()) as CasePolicyStatusResponse;
+}
+
+export async function seedDemoPolicy(caseId: string, policyKey?: string) {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/demo/seed-policy`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify(policyKey ? { policy_key: policyKey } : {}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Seed demo policy failed");
+  }
+
+  return (await response.json()) as SeedDemoPolicyResponse;
 }
 
 export async function uploadPolicy(caseId: string, file: File) {
