@@ -22,6 +22,7 @@ import {
   DemoPolicy,
   CasePolicyStatusResponse,
   SeedDemoPolicyResponse,
+  patchAccidentStageA,
 } from "@/lib/api";
 
 function CitationList({ citations }: { citations: Citation[] }) {
@@ -119,6 +120,62 @@ const STAGE_3_RULE_EVENT = {
   metadata: { demo_label: "claim_rule_stage_3" },
 };
 
+type TriState = "unknown" | "true" | "false";
+
+type StageAFormState = {
+  occurred_at: string;
+  address: string;
+  quick_summary: string;
+
+  owner_name: string;
+  owner_phone: string;
+  owner_insurer: string;
+  owner_policy_number: string;
+
+  other_name: string;
+  other_phone: string;
+  other_insurer: string;
+  other_policy_number: string;
+
+  injuries_reported: TriState;
+  police_called: TriState;
+  drivable: TriState;
+  tow_requested: TriState;
+};
+
+const EMPTY_STAGE_A_FORM: StageAFormState = {
+  occurred_at: "",
+  address: "",
+  quick_summary: "",
+
+  owner_name: "",
+  owner_phone: "",
+  owner_insurer: "",
+  owner_policy_number: "",
+
+  other_name: "",
+  other_phone: "",
+  other_insurer: "",
+  other_policy_number: "",
+
+  injuries_reported: "unknown",
+  police_called: "unknown",
+  drivable: "unknown",
+  tow_requested: "unknown",
+};
+
+function booleanToTriState(value: unknown): TriState {
+  if (value === true) return "true";
+  if (value === false) return "false";
+  return "unknown";
+}
+
+function triStateToBoolean(value: TriState): boolean | null {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
+
 export default function HomePage() {
   const [caseId, setCaseId] = useState(DEFAULT_POLICY_CASE_ID);
   const [accidentCaseId, setAccidentCaseId] = useState(
@@ -150,6 +207,11 @@ export default function HomePage() {
   const [seedPolicyResult, setSeedPolicyResult] =
     useState<SeedDemoPolicyResponse | null>(null);
 
+  const [stageAForm, setStageAForm] =
+    useState<StageAFormState>(EMPTY_STAGE_A_FORM);
+  const [stageAResultMessage, setStageAResultMessage] = useState("");
+  const [loadingSaveStageA, setLoadingSaveStageA] = useState(false);
+
   const [loadingHealth, setLoadingHealth] = useState(false);
   const [loadingUpload, setLoadingUpload] = useState(false);
   const [loadingAsk, setLoadingAsk] = useState(false);
@@ -176,6 +238,38 @@ export default function HomePage() {
     if (!caseId.trim()) return;
     loadPolicyStatus(caseId);
   }, [caseId]);
+
+  useEffect(() => {
+    if (!caseSnapshot?.stage_a) return;
+
+    const stageA = caseSnapshot.stage_a as Record<string, unknown>;
+    const location = (stageA.location as Record<string, unknown> | undefined) || {};
+    const ownerParty =
+      (stageA.owner_party as Record<string, unknown> | undefined) || {};
+    const otherParty =
+      (stageA.other_party as Record<string, unknown> | undefined) || {};
+
+    setStageAForm({
+      occurred_at: String(stageA.occurred_at || ""),
+      address: String(location.address || ""),
+      quick_summary: String(stageA.quick_summary || ""),
+
+      owner_name: String(ownerParty.name || ""),
+      owner_phone: String(ownerParty.phone || ""),
+      owner_insurer: String(ownerParty.insurer || ""),
+      owner_policy_number: String(ownerParty.policy_number || ""),
+
+      other_name: String(otherParty.name || ""),
+      other_phone: String(otherParty.phone || ""),
+      other_insurer: String(otherParty.insurer || ""),
+      other_policy_number: String(otherParty.policy_number || ""),
+
+      injuries_reported: booleanToTriState(stageA.injuries_reported),
+      police_called: booleanToTriState(stageA.police_called),
+      drivable: booleanToTriState(stageA.drivable),
+      tow_requested: booleanToTriState(stageA.tow_requested),
+    });
+  }, [caseSnapshot]);
 
   async function loadDemoPolicies() {
     setLoadingDemoPolicies(true);
@@ -304,6 +398,7 @@ export default function HomePage() {
   async function handleSeedAccidentDemo() {
     setLoadingSeed(true);
     setError("");
+    setStageAResultMessage("");
     try {
       const result = await seedAccidentDemoCase(accidentCaseId.trim());
       setCaseSnapshot(result.case_snapshot);
@@ -327,6 +422,59 @@ export default function HomePage() {
       );
     } finally {
       setLoadingSeed(false);
+    }
+  }
+
+  async function handleSaveStageA() {
+    setLoadingSaveStageA(true);
+    setError("");
+    setStageAResultMessage("");
+
+    try {
+      const payload = {
+        occurred_at: stageAForm.occurred_at || null,
+        location: {
+          address: stageAForm.address || null,
+        },
+        owner_party: {
+          role: "owner",
+          name: stageAForm.owner_name,
+          phone: stageAForm.owner_phone || null,
+          insurer: stageAForm.owner_insurer || null,
+          policy_number: stageAForm.owner_policy_number || null,
+        },
+        other_party: {
+          role: "other_driver",
+          name: stageAForm.other_name,
+          phone: stageAForm.other_phone || null,
+          insurer: stageAForm.other_insurer || null,
+          policy_number: stageAForm.other_policy_number || null,
+        },
+        injuries_reported: triStateToBoolean(stageAForm.injuries_reported),
+        police_called: triStateToBoolean(stageAForm.police_called),
+        drivable: triStateToBoolean(stageAForm.drivable),
+        tow_requested: triStateToBoolean(stageAForm.tow_requested),
+        quick_summary: stageAForm.quick_summary,
+        stage_completed_at: new Date().toISOString(),
+      };
+
+      await patchAccidentStageA(accidentCaseId.trim(), payload);
+      setStageAResultMessage("Stage A saved successfully.");
+
+      const refreshed = await getCaseSnapshot(accidentCaseId.trim());
+      setCaseSnapshot(refreshed);
+      setReportResult(
+        refreshed.report_payload && refreshed.chat_context
+          ? {
+              report_payload: refreshed.report_payload,
+              chat_context: refreshed.chat_context,
+            }
+          : null
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save Stage A failed");
+    } finally {
+      setLoadingSaveStageA(false);
     }
   }
 
@@ -366,7 +514,7 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-gray-50 px-6 py-10">
-      <div className="mx-auto max-w-4xl space-y-8">
+      <div className="mx-auto max-w-5xl space-y-8">
         <div>
           <h1 className="text-3xl font-bold">ClaimMate Demo UI</h1>
           <p className="mt-2 text-gray-600">
@@ -491,7 +639,7 @@ export default function HomePage() {
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            className="w-full rounded p-2 border"
+            className="w-full rounded border p-2"
           />
 
           <button
@@ -554,6 +702,221 @@ export default function HomePage() {
                 {loadingReport ? "Generating..." : "Generate report JSON"}
               </button>
             </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border p-4">
+            <h3 className="text-lg font-semibold">Stage A Form</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              This is the first real accident intake form for Lou’s workflow.
+            </p>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Occurred At
+                </label>
+                <input
+                  type="datetime-local"
+                  value={stageAForm.occurred_at}
+                  onChange={(e) =>
+                    setStageAForm((prev) => ({
+                      ...prev,
+                      occurred_at: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Location Address
+                </label>
+                <input
+                  value={stageAForm.address}
+                  onChange={(e) =>
+                    setStageAForm((prev) => ({
+                      ...prev,
+                      address: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-xl border px-3 py-2"
+                  placeholder="123 Main St, Los Angeles, CA"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium">
+                Quick Summary
+              </label>
+              <textarea
+                value={stageAForm.quick_summary}
+                onChange={(e) =>
+                  setStageAForm((prev) => ({
+                    ...prev,
+                    quick_summary: e.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border px-3 py-2"
+                placeholder="Rear-end collision at a red light..."
+              />
+            </div>
+
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <div className="rounded-xl border bg-gray-50 p-4">
+                <h4 className="font-semibold">Owner Party</h4>
+                <div className="mt-3 space-y-3">
+                  <input
+                    value={stageAForm.owner_name}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        owner_name: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                    placeholder="Owner name"
+                  />
+                  <input
+                    value={stageAForm.owner_phone}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        owner_phone: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                    placeholder="Owner phone"
+                  />
+                  <input
+                    value={stageAForm.owner_insurer}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        owner_insurer: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                    placeholder="Owner insurer"
+                  />
+                  <input
+                    value={stageAForm.owner_policy_number}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        owner_policy_number: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                    placeholder="Owner policy number"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border bg-gray-50 p-4">
+                <h4 className="font-semibold">Other Party</h4>
+                <div className="mt-3 space-y-3">
+                  <input
+                    value={stageAForm.other_name}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        other_name: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                    placeholder="Other driver name"
+                  />
+                  <input
+                    value={stageAForm.other_phone}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        other_phone: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                    placeholder="Other driver phone"
+                  />
+                  <input
+                    value={stageAForm.other_insurer}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        other_insurer: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                    placeholder="Other driver insurer"
+                  />
+                  <input
+                    value={stageAForm.other_policy_number}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        other_policy_number: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                    placeholder="Other driver policy number"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-4">
+              {[
+                ["injuries_reported", "Injuries Reported"],
+                ["police_called", "Police Called"],
+                ["drivable", "Vehicle Drivable"],
+                ["tow_requested", "Tow Requested"],
+              ].map(([key, label]) => (
+                <div key={key}>
+                  <label className="mb-1 block text-sm font-medium">
+                    {label}
+                  </label>
+                  <select
+                    value={stageAForm[key as keyof StageAFormState] as string}
+                    onChange={(e) =>
+                      setStageAForm((prev) => ({
+                        ...prev,
+                        [key]: e.target.value as TriState,
+                      }))
+                    }
+                    className="w-full rounded-xl border px-3 py-2"
+                  >
+                    <option value="unknown">Unknown</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                onClick={handleSaveStageA}
+                disabled={loadingSaveStageA}
+                className="rounded-xl border px-4 py-2"
+              >
+                {loadingSaveStageA ? "Saving..." : "Save Stage A"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStageAForm(EMPTY_STAGE_A_FORM)}
+                className="rounded-xl border px-4 py-2"
+              >
+                Clear Form
+              </button>
+            </div>
+
+            {stageAResultMessage && (
+              <div className="mt-4 rounded bg-green-50 p-3 text-sm">
+                {stageAResultMessage}
+              </div>
+            )}
           </div>
 
           {caseSnapshot && (

@@ -156,6 +156,11 @@ export type SeedAccidentDemoResponse = {
   case_snapshot: CaseSnapshotResponse | null;
 };
 
+export type PatchStageAResponse = {
+  case_id: string;
+  stage_a: Record<string, unknown>;
+};
+
 export async function checkHealth() {
   const response = await fetch(`${API_BASE_URL}/health`, {
     method: "GET",
@@ -277,6 +282,27 @@ export async function getCaseSnapshot(caseId: string) {
   }
 
   return (await response.json()) as CaseSnapshotResponse;
+}
+
+export async function patchAccidentStageA(
+  caseId: string,
+  payload: Record<string, unknown>
+) {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/accident/stage-a`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Save Stage A failed");
+  }
+
+  return (await response.json()) as PatchStageAResponse;
 }
 
 export async function generateAccidentReport(caseId: string) {
