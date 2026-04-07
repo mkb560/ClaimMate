@@ -1,6 +1,6 @@
 # Backend integration summary & tips for Lou
 
-This document summarizes what the **app-layer backend integration** added (per `KE_WU_HANDOFF_ZH.md` / `KE_API_CONTRACT_ZH.md`) and gives **practical guidance for frontend** work.
+This document summarizes the current app-layer backend API and gives practical frontend integration notes. It replaces the earlier Ke-only minimal API notes.
 
 ---
 
@@ -8,159 +8,154 @@ This document summarizes what the **app-layer backend integration** added (per `
 
 ### FastAPI structure
 
-- `**backend/main.py`** — App factory: lifespan (DB engine + bootstrap), CORS, router includes only.
-- `**backend/app/routers/**` — App-layer routes:
-  - `health.py` — `GET /health`
-  - `policy_ask.py` — policy upload + RAG ask
-  - `cases_and_accident.py` — cases, accident intake, report, claim dates, chat event
+- `backend/main.py` assembles the FastAPI app: lifespan bootstrap, CORS, and router includes.
+- `backend/app/routers/health.py` exposes `GET /health`.
+- `backend/app/routers/policy_ask.py` exposes policy upload, policy status, demo policy seed, demo policy catalog, and policy Q&A.
+- `backend/app/routers/cases_and_accident.py` exposes case, accident, report, claim-date, chat event, and chat message routes.
 
 ### Startup & database
 
-- On startup, if `DATABASE_URL` is set, the app creates a shared async engine and runs `**bootstrap_vector_store**`:
-  - Ensures **pgvector** extension and `**vector_documents`** table (RAG).
-  - Creates the `**cases**` table (app + deadline checker).
-- `**backend/ai/runtime.py**` wires vector schema + case schema together.
+- On startup, if `DATABASE_URL` is set, the app creates a shared async engine and runs `bootstrap_vector_store`.
+- Bootstrap ensures the `pgvector` extension and `vector_documents` table for RAG.
+- Bootstrap also creates the app-layer `cases` table and the `case_chat_messages` table for local/dev environments.
+- `backend/ai/runtime.py` wires vector schema and app-layer schema together.
 
-### Minimal `cases` model
+### Minimal case model
 
-- Table `**cases**` (`backend/models/case_orm.py`), keyed by string `**id**` (same value as `**case_id**` in URLs and RAG).
-- Columns used by the AI deadline checker: `**claim_notice_at**`, `**proof_of_claim_at**`, `**last_deadline_alert_at**`.
-- JSON columns: `**stage_a_json**`, `**stage_b_json**`, cached `**report_payload_json**`, `**chat_context_json**`, plus timestamps.
-
-### Policy + ask (Lou’s first milestone)
-
-Still the primary demo path; contract details remain in `**docs/KE_API_CONTRACT_ZH.md**`.
-
-
-| Method | Path                      | Notes                                                  |
-| ------ | ------------------------- | ------------------------------------------------------ |
-| `GET`  | `/demo/policies`          | Read the built-in demo policy catalog with labels, filenames, default case ids, sample questions |
-| `GET`  | `/cases/{case_id}/policy` | Read the currently indexed policy summary for a case id |
-| `POST` | `/cases/{case_id}/demo/seed-policy` | Seed one of the built-in demo policy PDFs into KB-A; optional JSON body `{"policy_key": "..."}` |
-| `POST` | `/cases/{case_id}/policy` | `multipart/form-data`, field name `**file**`, PDF only |
-| `POST` | `/cases/{case_id}/ask`    | JSON `{"question": "..."}`                             |
-
-
-- `**case_id**` must match `^[A-Za-z0-9_-]{1,64}$`.
-- Upload/ask call `**ensure_case**`: the row is created automatically if missing (no strict requirement to call `POST /cases` first for RAG-only flows).
-- `**GET /cases/{case_id}/policy**` returns `**has_policy**`, `**chunk_count**`, `**source_label**`, `**filename**`, and optional `**demo_policy**` metadata so the frontend can rehydrate after refresh.
-- For the 3 fixed demo policy cases (`allstate-change-2025-05`, `allstate-renewal-2025-08`, `progressive-verification-2026-03`), frontend/demo callers can skip manual upload and call `**POST /cases/{case_id}/demo/seed-policy**` directly.
-- For a custom `case_id`, call `**POST /cases/{case_id}/demo/seed-policy**` with JSON `{"policy_key": "allstate-change" | "allstate-renewal" | "progressive-verification"}`.
-
-### Accident workflow (second line)
-
-Aligned with `**docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md**` and `**backend/models/accident_types.py**`.
-
-
-| Method  | Path                                | Purpose                                                                          |
-| ------- | ----------------------------------- | -------------------------------------------------------------------------------- |
-| `POST`  | `/cases`                            | Create a case; optional body `{"case_id": "my-id"}` or server-generated `case-…` |
-| `GET`   | `/cases/{case_id}`                  | Read the current case snapshot: claim dates, Stage A/B JSON, report/chat caches |
-| `POST`  | `/cases/{case_id}/demo/seed-accident` | Seed the built-in accident/chat demo payloads for a given case id               |
-| `PATCH` | `/cases/{case_id}/accident/stage-a` | Merge JSON into Stage A intake                                                   |
-| `PATCH` | `/cases/{case_id}/accident/stage-b` | Merge JSON into Stage B intake                                                   |
-| `POST`  | `/cases/{case_id}/accident/report`  | Build report via `report_payload_builder`, store payload + chat context          |
-| `GET`   | `/cases/{case_id}/accident/report`  | Read stored report + chat context                                                |
-
-
-**PDF file generation** and **real group-chat rooms** are not implemented yet; the API returns **JSON** suitable for preview and future PDF/chat wiring.
-
-### Claim dates & chat (app hooks)
-
-
-| Method  | Path                           | Purpose                                                                                         |
-| ------- | ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `PATCH` | `/cases/{case_id}/claim-dates` | Update claim dates; clears `**last_deadline_alert_at`** for deadline alerts                     |
-| `POST`  | `/cases/{case_id}/chat/event`  | Full `**ChatEvent**` → `**handle_chat_event**`. **Persists** user lines (when `trigger` is `MESSAGE` and text non-empty) and AI lines when the model returns a payload. |
-| `GET`   | `/cases/{case_id}/chat/messages` | Chat timeline: query `limit` (1–500, default 100), `offset`. Items include `message_type` `user` \| `ai`, `body_text`, optional `ai_payload` (citations/trigger). |
-| `POST`  | `/cases/{case_id}/chat/messages` | **Lou-friendly:** JSON `{"message_text": "...", "sender_role": "owner", "invite_sent": false, "participants": null}`. Defaults to a single owner participant (stage 1). Put **`@AI`** in `message_text` to trigger the same mention path as the AI core. |
-| `DELETE`| `/cases/{case_id}` | **204** — removes the case row, all persisted chat lines for that case, and **KB-A** vector chunks for that `case_id` (demo reset / minimal lifecycle). **404** if case missing. |
-
-
-- `**GET /cases/{case_id}**` snapshot includes `**room_bootstrap**` when `chat_context_json` exists: trimmed fields (`pinned_document_title`, `summary`, `key_facts`, `follow_up_items`, `party_comparison_rows`, `generated_at`) so the UI can seed a “room” without re-parsing the full report payload.
-
-### Tests
-
-- **Unit tests** — `pytest` from `backend` (many paths mocked; no live DB required).
-- **Integration tests** — `pytest -m integration` — real `**DATABASE_URL`** (Postgres + pgvector); see `**backend/tests/test_integration_cases_db.py**`. These cover case + accident + claim-dates, **not** OpenAI/RAG.
-
-### Local paths
-
-- Uploaded policies are stored under `**backend/.local_data/policies/{case_id}/`** (configurable via `app/paths.py`).
+- `cases` is keyed by string `id`, which is the same value as `case_id` in URLs and RAG calls.
+- Deadline fields: `claim_notice_at`, `proof_of_claim_at`, `last_deadline_alert_at`.
+- JSON fields: `stage_a_json`, `stage_b_json`, `report_payload_json`, `chat_context_json`.
+- Timestamps: `created_at`, `updated_at`.
 
 ---
 
-## Tips for Lou (frontend)
+## Policy + ask
 
-### 1. Base URL and CORS
+This remains the primary demo path. For copy-paste frontend examples, see `docs/YI_FRONTEND_API_EXAMPLE_ZH.md`.
 
-- Default dev server: e.g. `http://127.0.0.1:8000` (see `APP_HOST` / `APP_PORT` in `.env`).
-- CORS allow-lists are configured in `**backend/.env**` (`CORS_ALLOW_ORIGINS`, `CORS_ALLOW_ORIGIN_REGEX`). Add your dev origin if the browser blocks requests.
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/demo/policies` | Read the built-in demo policy catalog with labels, filenames, default case IDs, and sample questions. |
+| `GET` | `/cases/{case_id}/policy` | Read the currently indexed policy summary for a case ID. |
+| `POST` | `/cases/{case_id}/demo/seed-policy` | Seed one of the built-in demo policy PDFs into KB-A. Optional JSON body: `{"policy_key": "..."}`. |
+| `POST` | `/cases/{case_id}/policy` | Upload a PDF with `multipart/form-data`, field name `file`. |
+| `POST` | `/cases/{case_id}/ask` | Ask policy/regulatory questions with JSON body `{"question": "..."}`. |
 
-### 2. Policy upload
+Important notes:
 
-- For a picker UI or demo dropdown, call `**GET /demo/policies**` first instead of hardcoding the 3 built-in policy choices in multiple places.
-- After seed or upload, call `**GET /cases/{case_id}/policy**` if the page needs to recover indexed-policy state after a refresh.
-- For the fastest demo path, prefer `**POST /cases/{case_id}/demo/seed-policy**` instead of asking teammates to manually upload a PDF every time.
-- Use `**POST /cases/{case_id}/policy**` with form field `**file**` (not `upload` or `document`).
-- Only **PDF**; server checks magic bytes `%PDF`.
-- Response includes `**chunk_count`** and `**status: "indexed"**` when ingest succeeds.
+- `case_id` must match `^[A-Za-z0-9_-]{1,64}$`.
+- Upload/ask calls run `ensure_case`, so the case row is created automatically if missing.
+- `GET /cases/{case_id}/policy` returns `has_policy`, `chunk_count`, `source_label`, `filename`, and optional `demo_policy` metadata.
+- Fixed demo policy case IDs are `allstate-change-2025-05`, `allstate-renewal-2025-08`, and `progressive-verification-2026-03`.
+- For a custom `case_id`, call `POST /cases/{case_id}/demo/seed-policy` with `{"policy_key": "allstate-change" | "allstate-renewal" | "progressive-verification"}`.
 
-### 3. Ask
+---
 
-- `**POST /cases/{case_id}/ask**` with JSON `**question**` (string, required, max length 4000).
-- Response includes `**answer**`, `**disclaimer**`, `**citations**`. Each citation should expose at least: `**source_type**` (`kb_a` vs `kb_b`), `**source_label**`, `**document_id**`, `**page_num**`, `**section**`, `**excerpt**` — use `**source_type**` in the UI so users can tell “my policy” vs “external reference”.
+## Accident workflow
 
-### 4. Accident forms — field names
+The accident workflow aligns with `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md` and `backend/models/accident_types.py`.
 
-- **Do not invent a parallel schema.** Use the same **snake_case** names as in `**backend/models/accident_types.py`** (and `**ACCIDENT_WORKFLOW_CONTRACT_ZH.md**`): e.g. `occurred_at`, `quick_summary`, `owner_party`, `photo_attachments`, `detailed_narrative`, `witness_contacts`, enums like `role`, `category`.
-- **PATCH** bodies are **deep-merged** into stored JSON; omit fields you are not changing.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/cases` | Create a case. The caller can provide `{"case_id": "my-id"}` or let the server generate one. |
+| `GET` | `/cases/{case_id}` | Read the current case snapshot: claim dates, Stage A/B JSON, report/chat caches, and optional `room_bootstrap`. |
+| `POST` | `/cases/{case_id}/demo/seed-accident` | Seed the built-in accident/chat demo payloads for a case ID. |
+| `PATCH` | `/cases/{case_id}/accident/stage-a` | Deep-merge JSON into Stage A intake. |
+| `PATCH` | `/cases/{case_id}/accident/stage-b` | Deep-merge JSON into Stage B intake. |
+| `POST` | `/cases/{case_id}/accident/report` | Build and store the deterministic report payload plus chat context. |
+| `GET` | `/cases/{case_id}/accident/report` | Read the stored report payload and chat context. |
+| `DELETE` | `/cases/{case_id}` | Delete the case row, related chat messages, and KB-A vector chunks for demo cleanup. |
 
-### 5. Suggested UX order
+Not implemented yet: real PDF file generation and real WebSocket group-chat rooms. The current API returns JSON suitable for preview and future product wiring.
 
-1. `**POST /cases`** (optional if you only use RAG with a known `case_id` string).
-2. For a demo picker, call `**GET /demo/policies**`.
-3. For the fastest policy demo, use one of the fixed demo case ids and call `**POST /cases/{case_id}/demo/seed-policy**`.
-4. `**GET /cases/{case_id}/policy**` if the page needs to recover which policy is currently indexed.
-5. For accident demo mode, you can directly call `**POST /cases/{case_id}/demo/seed-accident**` to prepare a stable seeded case.
-6. `**GET /cases/{case_id}`** whenever the page loads or refreshes, so the UI can rehydrate saved state instead of assuming a blank form.
-7. Stage A form → `**PATCH .../accident/stage-a**`
-8. Stage B form → `**PATCH .../accident/stage-b**`
-9. `**POST .../accident/report**` then `**GET .../accident/report**` for preview / pinned summary data.
-10. Claim dates when the user has them → `**PATCH .../claim-dates**` (ISO-8601 datetimes).
+---
 
-### 6. Errors worth handling in UI
+## Claim dates & chat
 
-- **503** — `DATABASE_URL is not configured`, `OPENAI_API_KEY is not configured`, or `**AI bootstrap failed: …`** (show a friendly “backend not ready” message).
-- **400** — invalid `case_id`, non-PDF upload, empty question, etc.
-- **404** — missing case on `**GET /cases/{case_id}`** or missing accident report on `**GET .../accident/report`**
-- **409** — `**POST /cases`** with a duplicate `case_id`
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `PATCH` | `/cases/{case_id}/claim-dates` | Update deadline fields and clear `last_deadline_alert_at`. |
+| `POST` | `/cases/{case_id}/chat/event` | Full `ChatEvent` payload into `handle_chat_event`; persists user rows when applicable and AI rows when AI responds. |
+| `GET` | `/cases/{case_id}/chat/messages` | Read the persisted chat timeline. Supports `limit` and `offset`. |
+| `POST` | `/cases/{case_id}/chat/messages` | Lou-friendly simplified message API. Body: `{"message_text": "...", "sender_role": "owner", "invite_sent": false, "participants": null}`. |
 
-### 7. Health check
+Chat notes:
 
-- `**GET /health**` — use to gate the demo: `status`, `ai_ready`, `ai_bootstrap_error`.
+- Put `@AI` in `message_text` to trigger the same mention path as the AI core.
+- `GET /cases/{case_id}/chat/messages` returns `message_type` (`user` or `ai`), `body_text`, timestamps, and optional `ai_payload`.
+- `GET /cases/{case_id}` includes `room_bootstrap` when `chat_context_json` exists. This lets the UI seed a future chat room or pinned summary without parsing the full report payload.
 
-### 8. OpenAPI
+---
 
-- `**GET /docs**` (Swagger UI) on the running server for quick experiments.
+## Tips for Lou
+
+### Base URL and CORS
+
+- Local backend default: `http://127.0.0.1:8000`.
+- The shared backend URL changes when ngrok is restarted; ask Mingtao/Ke for the current base URL.
+- CORS is configured through `backend/.env` with `CORS_ALLOW_ORIGINS` and `CORS_ALLOW_ORIGIN_REGEX`.
+
+### Policy upload and demo seed
+
+- For a demo picker, call `GET /demo/policies` first instead of hardcoding the built-in policy choices in multiple places.
+- For the fastest demo path, call `POST /cases/{case_id}/demo/seed-policy` instead of manually uploading a PDF.
+- After seed or upload, call `GET /cases/{case_id}/policy` to recover indexed-policy state after refresh.
+- Real PDF upload uses `POST /cases/{case_id}/policy` with form field `file`; server checks PDF magic bytes.
+- Successful policy ingestion returns `chunk_count` and `status: "indexed"`.
+
+### Ask responses
+
+- `POST /cases/{case_id}/ask` requires JSON field `question`.
+- Response includes `answer`, `disclaimer`, and `citations`.
+- Each citation includes fields like `source_type`, `source_label`, `document_id`, `page_num`, `section`, and `excerpt`.
+- Use `source_type` in the UI so users can tell policy sources (`kb_a`) from external reference sources (`kb_b`).
+
+### Accident forms
+
+- Do not invent a parallel schema. Use the snake_case field names in `backend/models/accident_types.py` and `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`.
+- Stage A/B `PATCH` bodies are deep-merged into stored JSON, so omitted fields are left unchanged.
+
+### Suggested frontend order
+
+1. Optionally create a case with `POST /cases`.
+2. For policy demo mode, call `GET /demo/policies`.
+3. Use a fixed demo case ID and call `POST /cases/{case_id}/demo/seed-policy`.
+4. Call `GET /cases/{case_id}/policy` to confirm which policy is indexed.
+5. For accident demo mode, call `POST /cases/{case_id}/demo/seed-accident`.
+6. Call `GET /cases/{case_id}` on page load or refresh to rehydrate saved state.
+7. Save Stage A with `PATCH /cases/{case_id}/accident/stage-a`.
+8. Save Stage B with `PATCH /cases/{case_id}/accident/stage-b`.
+9. Generate report preview with `POST /cases/{case_id}/accident/report`.
+10. Read timeline with `GET /cases/{case_id}/chat/messages` and send chat lines with `POST /cases/{case_id}/chat/messages`.
+
+### Errors worth handling in UI
+
+- `503`: missing backend config or AI bootstrap failure.
+- `400`: invalid `case_id`, non-PDF upload, empty question, or validation issue.
+- `404`: missing case or missing accident report.
+- `409`: duplicate case ID on `POST /cases`.
+
+### Quick inspection endpoints
+
+- `GET /health` checks `status`, `ai_ready`, and `ai_bootstrap_error`.
+- `GET /docs` opens Swagger UI on the running server.
 
 ---
 
 ## Related docs
 
-
-| Doc                                     | Content                             |
-| --------------------------------------- | ----------------------------------- |
-| `docs/KE_API_CONTRACT_ZH.md`            | Minimal policy + ask contract       |
-| `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md` | Stage A/B + report + chat context   |
-| `docs/KE_WU_HANDOFF_ZH.md`              | Original integration scope          |
-| `backend/.env.example`                  | Env vars for local / shared backend |
-
+| Doc | Content |
+| --- | --- |
+| `docs/YI_FRONTEND_API_EXAMPLE_ZH.md` | Frontend copy-paste API examples. |
+| `docs/AI_CHAT_BEHAVIOR_CONTRACT_ZH.md` | Mingtao AI chat trigger/response contract. |
+| `docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md` | Stage A/B, report, and chat context contract. |
+| `docs/RUN_DEMO_ZH.md` | Local/shared demo runbook. |
+| `backend/.env.example` | Env vars for local/shared backend. |
 
 ---
 
-## Environment reminder (for anyone running the stack)
+## Environment reminder
 
-- `**DATABASE_URL**` — Postgres with **pgvector**; use async driver `**postgresql+psycopg://...`**
-- `**OPENAI_API_KEY**` — Required for policy ingest + ask + chat AI paths
-- Run `**uvicorn**` from `**backend/**` so `**.env**` is picked up (`ai/config.py` loads `env_file=".env"` relative to the process working directory)
+- `DATABASE_URL`: Postgres with `pgvector`; use async driver `postgresql+psycopg://...`.
+- `OPENAI_API_KEY`: required for policy ingest, ask, and chat AI paths.
+- Run `uvicorn` from `backend/` so `.env` is picked up correctly.

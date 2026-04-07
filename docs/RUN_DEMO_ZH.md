@@ -219,17 +219,21 @@ cd backend
 
 - `docs/DEMO_PLAYBOOK_ZH.md`
 
-## 10. 前端接法
+## 11. 前端接法
 
 Lou 的前端接口示例在：
 
 - `docs/YI_FRONTEND_API_EXAMPLE_ZH.md`
 
-Ke 的接口契约在：
+当前后端接口汇总在：
 
-- `docs/KE_API_CONTRACT_ZH.md`
+- `docs/BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md`
 
-## 11. 当前最常见问题
+Mingtao AI chat 行为契约在：
+
+- `docs/AI_CHAT_BEHAVIOR_CONTRACT_ZH.md`
+
+## 12. 当前最常见问题
 
 ### `ai_ready` 是 `false`
 
@@ -257,7 +261,7 @@ Ke 的接口契约在：
 4. 你问的是当前 demo 文档里真实能答的问题
 5. 如果你走的是固定 demo case，先确认已经调用过 `/cases/{case_id}/demo/seed-policy`
 
-## 12. 远程共享给队友
+## 13. 远程共享给队友
 
 如果 Ke 和 Lou 不在同一地点，不打算各自本地起 RAG，而是直接连你这台机器已经跑好的后端，请看：
 

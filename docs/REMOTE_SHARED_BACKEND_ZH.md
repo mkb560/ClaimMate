@@ -201,8 +201,9 @@ cd backend
 
 文档也已经在仓库里：
 - docs/REMOTE_SHARED_BACKEND_ZH.md
-- docs/KE_API_CONTRACT_ZH.md
+- docs/BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md
 - docs/YI_FRONTEND_API_EXAMPLE_ZH.md
+- docs/AI_CHAT_BEHAVIOR_CONTRACT_ZH.md
 
 ## 最小联调流程
 

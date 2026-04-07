@@ -409,8 +409,8 @@ DATABASE_URL=postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate .
 - 第二主线契约：`docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
 - 本地 demo 运行：`docs/RUN_DEMO_ZH.md`
 - 远程共享后端：`docs/REMOTE_SHARED_BACKEND_ZH.md`
-- Ke handoff：`docs/KE_WU_HANDOFF_ZH.md`
-- Lou handoff：`docs/YI_HSIEN_LOU_HANDOFF_ZH.md`
+- 后端/前端集成说明：`docs/BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md`
+- 前端 API 示例：`docs/YI_FRONTEND_API_EXAMPLE_ZH.md`
 
 ## 当前最适合继续做的事
 

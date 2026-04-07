@@ -71,15 +71,15 @@ The snapshot from `GET /cases/{case_id}` includes **`room_bootstrap`** (derived 
 * **Unit Tests:** `cd backend && pytest` (extensive logic mocking, does not require local Postgres).
 * **Optional Integration Tests:** `pytest -m integration` (requires real `DATABASE_URL` for Postgres + pgvector, see `backend/tests/test_integration_cases_db.py`).
 * **Demo Policy Seed:** `python scripts/seed_demo_policy.py --case-id allstate-change-2025-05` (indexes fixed demo PDFs into KB-A).
-* **End-to-End Smoke Test:** `python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000` (runs real HTTP paths: `health -> demo/policies -> seed-policy -> ask -> seed-accident -> chat/event`).
+* **End-to-End Smoke Test:** `python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000` (runs real HTTP paths: `health -> demo/policies -> seed-policy -> ask -> seed-accident -> case snapshot(room_bootstrap) -> chat/messages -> chat/event`).
 * **Remote Shared Local Backend:** `backend/scripts/run_shared_backend.sh` (details in [`REMOTE_SHARED_BACKEND_ZH.md`](REMOTE_SHARED_BACKEND_ZH.md)).
 
 ### 5. Documentation and Frontend Integration Guide
 
-* Minimum API Contract: [`KE_API_CONTRACT_ZH.md`](KE_API_CONTRACT_ZH.md)  
-* Ke's Handoff Notes: [`KE_WU_HANDOFF_ZH.md`](KE_WU_HANDOFF_ZH.md)  
-* Lou's Integration Summary: [`BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md`](BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md)  
-* Lou's Direct Call Examples: [`YI_FRONTEND_API_EXAMPLE_ZH.md`](YI_FRONTEND_API_EXAMPLE_ZH.md)  
+* Backend/API Integration Summary: [`BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md`](BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md)
+* Lou's Direct Call Examples: [`YI_FRONTEND_API_EXAMPLE_ZH.md`](YI_FRONTEND_API_EXAMPLE_ZH.md)
+* AI Chat Behavior Contract: [`AI_CHAT_BEHAVIOR_CONTRACT_ZH.md`](AI_CHAT_BEHAVIOR_CONTRACT_ZH.md)
+* Demo Run Guide: [`RUN_DEMO_ZH.md`](RUN_DEMO_ZH.md)
 * Doc Index: [`docs/README.md`](README.md)
 
 ---

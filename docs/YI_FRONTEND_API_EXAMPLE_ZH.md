@@ -1,6 +1,6 @@
 # 给 Lou 的前端调用示例
 
-这份文档是给前端直接接接口用的。目标不是讲后端实现，而是告诉你现在怎么调用当前最适合前端 demo 的接口，不只是 upload + ask，也包括事故 case snapshot、报告预览和 chat event。
+这份文档是给前端直接接接口用的。目标不是讲后端实现，而是告诉你现在怎么调用当前最适合前端 demo 的接口，不只是 upload + ask，也包括事故 case snapshot、报告预览和 chat event/messages timeline。
 
 ## 当前可用接口
 
@@ -20,6 +20,8 @@
 - `GET /cases/{case_id}`
 - `POST /cases/{case_id}/demo/seed-accident`
 - `POST /cases/{case_id}/accident/report`
+- `GET /cases/{case_id}/chat/messages`
+- `POST /cases/{case_id}/chat/messages`
 - `POST /cases/{case_id}/chat/event`
 
 如果你只想先做最短 demo，还是可以只做 upload + ask；但如果你要继续接第二、第三主线，现在已经不需要自己猜接口了。
@@ -51,6 +53,7 @@
 4. 如果要刷新报告，调用 `POST /cases/{case_id}/accident/report`
 5. 再次 `GET /cases/{case_id}`，拿新的 `report_payload` / `chat_context`
 6. 用 `POST /cases/{case_id}/chat/event` 展示 AI chat response
+7. 如果页面要展示时间线，用 `POST /cases/{case_id}/chat/messages` 写入消息，再用 `GET /cases/{case_id}/chat/messages` 读取 timeline
 
 ## 1. Seed 固定 demo policy
 
@@ -313,7 +316,7 @@ export async function askPolicyQuestion(caseId: string, question: string) {
 }
 ```
 
-## 3. 前端建议的数据类型
+## 6. 前端建议的数据类型
 
 至少建议先写这些类型：
 
@@ -362,12 +365,22 @@ export type CaseSnapshotResponse = {
   stage_b: Record<string, unknown> | null
   report_payload: Record<string, unknown> | null
   chat_context: Record<string, unknown> | null
+  room_bootstrap: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }
+
+export type ChatMessage = {
+  id: string
+  case_id: string
+  sender_role: string
+  message_text: string
+  created_at: string
+  ai_response?: Record<string, unknown> | null
+}
 ```
 
-## 4. React 页面最小示例
+## 7. React 页面最小示例
 
 下面这个例子不是完整 UI，只是最小 happy path。
 
@@ -428,7 +441,7 @@ export default function DemoAskPage() {
 }
 ```
 
-## 5. citations 怎么展示最好
+## 8. citations 怎么展示最好
 
 前端不要直接把整个 `citations` JSON 粘出来，建议做成比较清楚的卡片或列表。
 
@@ -469,7 +482,7 @@ function CitationList({ citations }: { citations: Citation[] }) {
 }
 ```
 
-## 6. 事故 / chat 直接可用的 demo case
+## 9. 事故 / chat 直接可用的 demo case
 
 现在仓库里已经固定了一条事故 demo case：
 
@@ -564,7 +577,52 @@ export async function sendChatEvent(caseId: string) {
 }
 ```
 
-## 7. 推荐 demo 问题
+### 写入并读取 chat timeline
+
+如果前端要展示完整时间线，优先用简化版 messages API：
+
+```ts
+export async function sendChatMessage(caseId: string, messageText: string) {
+  const response = await fetch(`/cases/${caseId}/chat/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sender_role: "owner",
+      message_text: messageText,
+      participants: [
+        { user_id: "owner-1", role: "owner" },
+        { user_id: "adjuster-1", role: "adjuster" },
+      ],
+      invite_sent: true,
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || "Send chat message failed")
+  }
+
+  return response.json()
+}
+
+export async function getChatMessages(caseId: string) {
+  const response = await fetch(`/cases/${caseId}/chat/messages`, {
+    method: "GET",
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || "Load chat messages failed")
+  }
+
+  return response.json()
+}
+```
+
+## 10. 推荐 demo 问题
 
 如果你要先做固定 demo，可以直接用这些问题：
 
@@ -583,7 +641,7 @@ export async function sendChatEvent(caseId: string) {
 - `What is the policy number, policy period, and insurer?`
 - `Does this document say it is a full insurance policy or only verification of insurance?`
 
-## 8. 前端需要注意的错误情况
+## 11. 前端需要注意的错误情况
 
 ### 上传阶段
 
@@ -600,7 +658,7 @@ export async function sendChatEvent(caseId: string) {
 
 建议前端统一 toast 或 inline error 文案，不要只在 console 里报错。
 
-## 9. 现阶段最推荐你先做的 UI
+## 12. 现阶段最推荐你先做的 UI
 
 第一版建议你先做：
 
