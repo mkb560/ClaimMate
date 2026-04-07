@@ -4,16 +4,19 @@
 
 ## 推荐阅读顺序
 
-1. `PROJECT_PROGRESS_AND_STRUCTURE.md`：当前真实进度、API 范围和仓库结构。
-2. `RUN_DEMO_ZH.md`：本地/共享后端 demo 怎么跑。
-3. `BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md`：当前后端接口与前端对接说明。
-4. `AI_CHAT_BEHAVIOR_CONTRACT_ZH.md`：Mingtao 负责的 AI chat 行为契约。
-5. `plan.md`：AI Core MVP 方案与后续方向。
+1. `plan.md`：团队级整体项目计划、产品定位、三条主线和 roadmap。
+2. `PROJECT_PROGRESS_AND_STRUCTURE.md`：当前真实进度、API 范围和仓库结构。
+3. `RUN_DEMO_ZH.md`：本地/共享后端 demo 怎么跑。
+4. `BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md`：当前后端接口与前端对接说明。
+5. `YI_FRONTEND_API_EXAMPLE_ZH.md`：前端调用 policy / accident / report / chat API 的示例。
+6. `AI_CORE_PLAN_ZH.md`：Mingtao AI core / RAG / dispute / deadline / chat behavior 子计划。
+7. `AI_CHAT_BEHAVIOR_CONTRACT_ZH.md`：Mingtao 负责的 AI chat 行为契约。
 
 ## 项目与协作
 
+- `plan.md`：团队级整体项目计划，覆盖产品定位、三条主线、团队分工和 roadmap。
+- `AI_CORE_PLAN_ZH.md`：Mingtao AI core 详细子计划，保留原 AI Core MVP 方案细节。
 - `PROJECT_PROGRESS_AND_STRUCTURE.md`：基于当前代码整理的进度、待办方向与仓库结构。
-- `plan.md`：AI Core MVP 方案文档，已按当前实现同步。
 - `CONTRIBUTING.md`：团队协作规则、分支规范和本地检查要求。
 - `TEAM_TASKS.md`：当前任务拆分和协作优先级说明。
 - `progress_report_en.md`：英文阶段进度报告。
