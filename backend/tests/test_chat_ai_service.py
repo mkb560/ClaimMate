@@ -175,7 +175,67 @@ async def test_handle_chat_event_non_mention_dispute_takes_precedence_over_deadl
     assert response.metadata["stage"] == ChatStage.STAGE_3.value
     assert response.metadata["dispute_type"] == "DENIAL"
     assert response.metadata["recommended_statute"] == "10 CCR 2695.7(b)"
+    assert response.metadata["next_step_helper"] is True
+    assert "Next steps to consider:" in response.text
+    assert "What to collect:" in response.text
+    assert "denial letter" in response.text
     assert deadline_called is False
+
+
+async def test_handle_chat_event_explicit_deadline_mention_uses_deadline_explainer(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    policy_called = False
+    dispute_called = False
+
+    async def fake_answer_policy_question(case_id: str, question: str):
+        nonlocal policy_called
+        policy_called = True
+        return AnswerResponse(
+            answer=f"Policy answer.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    async def fake_build_dispute_response(case_id: str, question: str, stage: ChatStage):
+        nonlocal dispute_called
+        dispute_called = True
+        return AIResponse(
+            text=f"Dispute answer.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            trigger=AITrigger.DISPUTE,
+            metadata={"stage": stage.value},
+        )
+
+    async def fake_explain_deadlines_for_case(case_id: str, *, stage: ChatStage):
+        return AIResponse(
+            text=f"Deadline overview based on saved case dates.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            trigger=AITrigger.DEADLINE,
+            metadata={"stage": stage.value, "deadline_intent": "explainer"},
+        )
+
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "_build_dispute_response", fake_build_dispute_response)
+    monkeypatch.setattr(chat_ai_service, "explain_deadlines_for_case", fake_explain_deadlines_for_case)
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="@AI what deadlines should I know after the insurer denied my claim?",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.DEADLINE
+    assert response.metadata["stage"] == ChatStage.STAGE_1.value
+    assert response.metadata["deadline_intent"] == "explainer"
+    assert "Deadline overview" in response.text
+    assert policy_called is False
+    assert dispute_called is False
 
 
 async def test_handle_chat_event_deadline_fallback_when_no_mention_or_dispute(monkeypatch) -> None:

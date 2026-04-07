@@ -12,6 +12,14 @@ from models.ai_types import AIResponse, AITrigger, ChatStage
 
 ACKNOWLEDGMENT_WINDOW_DAYS = 15
 DECISION_WINDOW_DAYS = 40
+DEADLINE_QUESTION_TERMS = (
+    "deadline",
+    "deadlines",
+    "timeline",
+    "timelines",
+    "due date",
+    "due dates",
+)
 
 # Integration contract:
 # The application layer owns the `cases` table and must provide the following columns:
@@ -90,6 +98,17 @@ def _should_alert(window: DeadlineWindow) -> bool:
     return window.is_overdue or window.days_remaining <= ai_config.deadline_alert_threshold_days
 
 
+def is_deadline_question(message_text: str) -> bool:
+    lowered = message_text.lower()
+    if any(term in lowered for term in DEADLINE_QUESTION_TERMS):
+        return True
+    deadline_context_terms = ("due", "track", "watch")
+    window_terms = ("15-day", "15 day", "40-day", "40 day", "proof of claim", "proof-of-claim")
+    return any(window in lowered for window in window_terms) and any(
+        context in lowered for context in deadline_context_terms
+    )
+
+
 def _cooldown_elapsed(last_alert_at: datetime | None, now: datetime) -> bool:
     if last_alert_at is None:
         return True
@@ -108,6 +127,84 @@ def _format_deadline_message(window: DeadlineWindow, *, stage: ChatStage) -> str
         "If the saved dates are incomplete or outdated, update them before relying on this reminder."
     )
     return f"{body}\n\n{DISCLAIMER_FOOTER}"
+
+
+def _format_window_status(window: DeadlineWindow) -> str:
+    if window.is_overdue:
+        return f"overdue by {abs(window.days_remaining)} day(s)"
+    if window.days_remaining == 0:
+        return "due today"
+    return f"due in {window.days_remaining} day(s)"
+
+
+def _format_deadline_explainer(windows: list[DeadlineWindow], *, stage: ChatStage) -> str:
+    opener = "For reference: " if stage == ChatStage.STAGE_3 else ""
+    if not windows:
+        body = (
+            f"{opener}Deadline overview: I do not see saved claim dates for this case yet. "
+            "Two important California claim timelines to track are the 15-day acknowledgment window "
+            "after notice of claim and the 40-day decision window after proof of claim. "
+            "Save the claim notice date and proof-of-claim date so I can calculate exact due dates."
+        )
+        return f"{body}\n\n{DISCLAIMER_FOOTER}"
+
+    lines = [f"{opener}Deadline overview based on saved case dates:"]
+    for window in windows:
+        lines.append(
+            f"- {window.label}: due on {window.due_at.date().isoformat()} from the "
+            f"{window.source_date_label}; currently {_format_window_status(window)}."
+        )
+    lines.append(
+        "Common rule of thumb: track the 15-day acknowledgment window after notice of claim "
+        "and the 40-day decision window after proof of claim."
+    )
+    body = "\n".join(lines)
+    return f"{body}\n\n{DISCLAIMER_FOOTER}"
+
+
+async def explain_deadlines_for_case(case_id: str, *, stage: ChatStage) -> AIResponse:
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as session:
+        result = await session.execute(
+            text(
+                """
+                SELECT claim_notice_at, proof_of_claim_at
+                FROM cases
+                WHERE id = :case_id
+                """
+            ),
+            {"case_id": case_id},
+        )
+        row = result.mappings().first()
+
+    now = datetime.now(UTC)
+    windows = (
+        calculate_deadline_windows(
+            claim_notice_at=row.get("claim_notice_at"),
+            proof_of_claim_at=row.get("proof_of_claim_at"),
+            now=now,
+        )
+        if row
+        else []
+    )
+    return AIResponse(
+        text=_format_deadline_explainer(windows, stage=stage),
+        citations=[],
+        trigger=AITrigger.DEADLINE,
+        metadata={
+            "stage": stage.value,
+            "deadline_intent": "explainer",
+            "tracked_windows": [
+                {
+                    "deadline_type": window.label,
+                    "due_at": window.due_at.isoformat(),
+                    "days_remaining": window.days_remaining,
+                    "is_overdue": window.is_overdue,
+                }
+                for window in windows
+            ],
+        },
+    )
 
 
 async def on_claim_dates_updated(

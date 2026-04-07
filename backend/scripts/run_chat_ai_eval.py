@@ -123,6 +123,29 @@ async def _fake_maybe_get_deadline_alert(case_id: str, *, stage: ChatStage) -> A
     )
 
 
+async def _fake_explain_deadlines_for_case(case_id: str, *, stage: ChatStage) -> AIResponse:
+    opener = "For reference: " if stage == ChatStage.STAGE_3 else ""
+    return AIResponse(
+        text=(
+            f"{opener}Deadline overview based on saved case dates:\n"
+            "- acknowledgment: due on 2026-04-16 from the claim notice date; currently due in 2 day(s).\n"
+            "- decision: due on 2026-05-15 from the proof-of-claim date; currently due in 31 day(s).\n"
+            "Common rule of thumb: track the 15-day acknowledgment window after notice of claim and the 40-day decision window after proof of claim."
+            f"\n\n{DISCLAIMER_FOOTER}"
+        ),
+        citations=[],
+        trigger=AITrigger.DEADLINE,
+        metadata={
+            "stage": stage.value,
+            "deadline_intent": "explainer",
+            "tracked_windows": [
+                {"deadline_type": "acknowledgment", "due_at": "2026-04-16T00:00:00+00:00"},
+                {"deadline_type": "decision", "due_at": "2026-05-15T00:00:00+00:00"},
+            ],
+        },
+    )
+
+
 async def _fake_classify_dispute(message_text: str) -> DisputeClassification:
     lowered = message_text.lower()
     if "denied" in lowered or "claim denied" in lowered:
@@ -147,6 +170,7 @@ def _patched_chat_dependencies():
         "answer_dispute_question": _fake_answer_dispute_question,
         "summarize_policy_highlights": _fake_summarize_policy_highlights,
         "maybe_get_deadline_alert": _fake_maybe_get_deadline_alert,
+        "explain_deadlines_for_case": _fake_explain_deadlines_for_case,
         "classify_dispute": _fake_classify_dispute,
     }
     originals = {name: getattr(chat_ai_service, name) for name in replacements}
@@ -219,12 +243,28 @@ def _build_eval_cases() -> list[ChatEvalCase]:
             expected_trigger=AITrigger.DISPUTE,
             expected_stage=ChatStage.STAGE_3,
             expected_text_prefix="For reference:",
-            expected_text_contains=("denial",),
+            expected_text_contains=("denial", "Next steps to consider", "What to collect"),
             expected_metadata={
                 "dispute_type": "DENIAL",
                 "recommended_statute": "10 CCR 2695.7(b)",
+                "next_step_helper": True,
             },
             require_citations=True,
+        ),
+        ChatEvalCase(
+            name="stage_1_deadline_explainer_mention",
+            event=ChatEvent(
+                case_id="deadline-case",
+                sender_role="owner",
+                message_text="@AI what deadlines should I know for this claim?",
+                participants=_owner_participants(),
+                invite_sent=False,
+                trigger=ChatEventTrigger.MESSAGE,
+            ),
+            expected_trigger=AITrigger.DEADLINE,
+            expected_stage=ChatStage.STAGE_1,
+            expected_text_contains=("Deadline overview", "15-day acknowledgment", "40-day decision"),
+            expected_metadata={"deadline_intent": "explainer"},
         ),
         ChatEvalCase(
             name="stage_1_deadline_fallback",

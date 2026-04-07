@@ -9,6 +9,7 @@ ClaimMate 是一个面向车主的 AI 理赔助手原型项目。它的目标不
 - 支持返回 grounded answer + citations
 - 支持 `cases` 持久化、事故双阶段 intake、报告 JSON 生成
 - 支持 claim dates 更新和 chat-event 入口调用 AI orchestration
+- 支持 dispute next-step helper 和显式 deadline explainer
 - 支持一个最小 Next.js demo UI 去演示 policy Q&A、事故 snapshot、报告预览和 chat response
 - 支持本地 `pgvector` 向量检索
 - 支持通过临时公网地址把你本机后端共享给远程队友联调
@@ -104,7 +105,7 @@ RAG / demo 主路径：
 
 - `POST /cases/{case_id}/chat/event`
 
-也就是说，前端现在不仅可以围绕“上传保单 + 提问 + 展示 AI 回答”这条 demo 路联调，也可以开始对接事故流程、报告预览、claim date 更新和 chat-event 触发。
+也就是说，前端现在不仅可以围绕“上传保单 + 提问 + 展示 AI 回答”这条 demo 路联调，也可以开始对接事故流程、报告预览、claim date 更新和 chat-event 触发。chat AI 当前支持 `@AI` policy/RAG question、dispute next-step helper、显式 deadline explainer 和普通 deadline fallback。
 
 ### 4. 当前前端 demo UI
 
@@ -398,14 +399,15 @@ DATABASE_URL=postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate .
 
 ## 团队分工
 
-- Mingtao Ding：AI core、RAG、dispute、deadline、第二主线技术契约
+- Mingtao Ding：AI core、RAG、dispute、deadline、chat AI behavior、第二主线技术契约
 - Ke Wu：FastAPI integration、case/app layer、chat backend、deployment
 - Yi-Hsien Lou：事故表单、前端体验、PDF/report UX、演示流程
 
 ## 重要文档入口
 
 - 文档索引：`docs/README.md`
-- 详细 AI 方案：`docs/plan.md`
+- 整体项目计划：`docs/plan.md`
+- 详细 AI 子计划：`docs/AI_CORE_PLAN_ZH.md`
 - 第二主线契约：`docs/ACCIDENT_WORKFLOW_CONTRACT_ZH.md`
 - 本地 demo 运行：`docs/RUN_DEMO_ZH.md`
 - 远程共享后端：`docs/REMOTE_SHARED_BACKEND_ZH.md`

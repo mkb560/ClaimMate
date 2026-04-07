@@ -47,7 +47,8 @@ Policy Q&A
 - User policy documents 作为 KB-A，curated regulatory/reference docs 作为 KB-B。
 - `answer_policy_question(case_id, question)` 支持双源检索、回答和 inline `[S#]` citations。
 - 常见 policy fact question 会先走 deterministic extractor，再 fallback 到 general RAG generation。
-- dispute question 支持更窄的 KB-B regulatory retrieval，并带 stage-aware instruction。
+- dispute question 支持更窄的 KB-B regulatory retrieval，并带 stage-aware instruction；当前 dispute 回答还会附加 next-step helper，提示用户整理 denial/delay/amount dispute 相关材料和可追问保险公司的问题。
+- 用户显式询问 claim deadlines / timelines 时，Deadline Explainer 会根据已保存的 claim dates 解释 15-day acknowledgment 和 40-day decision window；没有保存日期时会说明需要先补日期。
 - 所有最终回答都附带固定 disclaimer。
 - 已有 `run_demo_eval.py` 和 `run_chat_ai_eval.py`，用于固定 demo/eval 和 chat AI deterministic regression。
 
@@ -123,7 +124,7 @@ Policy Q&A
 ### Short Term
 
 - Keep `main` stable and push owner work through `mingtao/dev`, `ke/...`, and `lou/...` style branches.
-- Mingtao: extend Dispute Next-Step Helper, Deadline Explainer, policy fact extraction, citation guard lite, and chat AI regression coverage.
+- Mingtao: Dispute Next-Step Helper 和 Deadline Explainer 已落地；下一步继续扩展 policy fact extraction、citation guard lite、真实 demo transcript 调优和 chat AI regression coverage。
 - Ke: continue from HTTP chat persistence toward WebSocket room/invite-link architecture and production DB migration path.
 - Lou: finish accident form polish, report preview/PDF UX, citation/chat timeline display, and final demo UI polish.
 

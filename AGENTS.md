@@ -161,7 +161,7 @@ backend/
 - Local curated PDFs under `claimmate_rag_docs/` can be indexed as KB-B without downloading remote sources
 - Supported policy-fact questions are answered first through deterministic extraction before falling back to general RAG generation
 - `answer_policy_question(case_id, question)` retrieves from both sources and answers with inline `[S#]` citations
-- `answer_dispute_question(...)` narrows regulatory retrieval to dispute-relevant documents and applies stage-specific instructions
+- `answer_dispute_question(...)` narrows regulatory retrieval to dispute-relevant documents and applies stage-specific instructions; chat dispute responses now append a short next-step helper for what happened, what to collect, and what to ask the insurer
 - If the first generation pass returns a grounded fallback response, the RAG layer performs a narrower rescue pass over top snippets before giving up
 - All final answers append a fixed disclaimer
 - Demo app uploads local PDFs into `backend/.local_data/policies/<case_id>/` before indexing them into KB-A
@@ -199,6 +199,7 @@ backend/
   - keyword-triggered dispute escalation
   - fallback deadline reminder checks
 - Stage 3 answers are prefixed with `For reference:` to keep the tone neutral in multi-party chat
+- Explicit `@AI` deadline/timeline questions use a Deadline Explainer based on saved claim dates before falling back to general policy QA
 - `POST /cases/{case_id}/chat/event` and `POST /cases/{case_id}/chat/messages` now persist user and AI rows into `case_chat_messages` for simple timeline rendering
 
 ### Accident workflow contract
@@ -216,6 +217,7 @@ backend/
   - 15-day acknowledgment window from `claim_notice_at`
   - 40-day decision window from `proof_of_claim_at`
 - Reminder cooldown is controlled by `last_deadline_alert_at`
+- Explicit deadline questions do not update the fallback reminder cooldown; they return an informational explainer with `metadata.deadline_intent = "explainer"`
 
 ## Important Integration Contracts
 

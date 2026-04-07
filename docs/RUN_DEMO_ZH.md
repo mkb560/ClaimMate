@@ -188,7 +188,7 @@ cd backend
 ./.venv/bin/python scripts/run_chat_ai_eval.py --json-out /tmp/claimmate_chat_ai_eval.json
 ```
 
-这条 eval 会覆盖空 `@AI`、stage 1 / stage 3 回答风格、非 mention dispute trigger、deadline fallback 和 policy indexed proactive response。
+这条 eval 会覆盖空 `@AI`、stage 1 / stage 3 回答风格、非 mention dispute trigger + next-step helper、显式 Deadline Explainer、deadline fallback 和 policy indexed proactive response。
 
 ## 9. 跑一轮真实 HTTP smoke
 

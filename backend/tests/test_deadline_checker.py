@@ -4,9 +4,11 @@ from ai.deadline import deadline_checker
 from ai.deadline.deadline_checker import (
     DeadlineWindow,
     _cooldown_elapsed,
+    _format_deadline_explainer,
     _format_deadline_message,
     _should_alert,
     calculate_deadline_windows,
+    is_deadline_question,
 )
 from ai.rag.prompt_templates import DISCLAIMER_FOOTER
 from models.ai_types import ChatStage
@@ -65,6 +67,40 @@ def test_deadline_message_omits_neutral_prefix_in_stage_1() -> None:
 
     assert message.startswith("Deadline reminder")
     assert not message.startswith("For reference:")
+
+
+def test_deadline_question_detector_matches_common_phrases() -> None:
+    assert is_deadline_question("What deadlines should I know?") is True
+    assert is_deadline_question("Can you explain the 40-day decision timeline?") is True
+    assert is_deadline_question("Should I track the 15-day acknowledgment window?") is True
+    assert is_deadline_question("What is the California 15-day claim acknowledgment rule?") is False
+    assert is_deadline_question("Does this policy include rental reimbursement?") is False
+
+
+def test_deadline_explainer_formats_saved_windows_for_stage_1() -> None:
+    message = _format_deadline_explainer([_window(days_remaining=2)], stage=ChatStage.STAGE_1)
+
+    assert message.startswith("Deadline overview based on saved case dates")
+    assert "- acknowledgment:" in message
+    assert "2026-04-16" in message
+    assert "due in 2 day(s)" in message
+    assert "15-day acknowledgment" in message
+    assert DISCLAIMER_FOOTER in message
+
+
+def test_deadline_explainer_uses_stage_3_neutral_prefix() -> None:
+    message = _format_deadline_explainer([_window(days_remaining=0)], stage=ChatStage.STAGE_3)
+
+    assert message.startswith("For reference: Deadline overview")
+    assert "due today" in message
+
+
+def test_deadline_explainer_handles_missing_dates() -> None:
+    message = _format_deadline_explainer([], stage=ChatStage.STAGE_1)
+
+    assert message.startswith("Deadline overview: I do not see saved claim dates")
+    assert "15-day acknowledgment window" in message
+    assert "40-day decision window" in message
 
 
 def test_deadline_cooldown_elapsed_respects_config(monkeypatch) -> None:

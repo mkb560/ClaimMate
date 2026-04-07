@@ -20,8 +20,9 @@ Mingtao 当前负责 ClaimMate 的 AI 核心部分：双知识源 RAG、dispute 
 
 - 对用户 policy PDF（KB-A）和 California / U.S. 法规资料（KB-B）做双知识源 RAG
 - 两层 dispute detection
-- 基于已存 claim dates 的被动 deadline reminder
+- 基于已存 claim dates 的被动 deadline reminder 与显式 Deadline Explainer
 - Stage 1 / 2 / 3 群聊 AI 行为
+- dispute 回答后的 next-step helper
 - 固定 disclaimer + inline citations
 - 第二主线的事故流程共享契约与报告 payload 中间层
 - 固定 demo/eval 与 smoke 脚本，用来保护 AI/RAG/chat 行为不回退
