@@ -21,6 +21,8 @@
   固定事故流程与 chat demo 资产、脚本和样例输出。
 - `DEMO_PLAYBOOK_ZH.md`
   固定 demo 路径、问题顺序和展示重点。
+- `AI_CHAT_BEHAVIOR_CONTRACT_ZH.md`
+  Mingtao 负责的 AI chat 触发规则、stage 语气、response 字段和回归检查说明。
 - `REMOTE_SHARED_BACKEND_ZH.md`
   如何把你本机后端通过公网共享给远程队友。
 - `RUN_DEMO_ZH.md`

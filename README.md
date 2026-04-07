@@ -132,6 +132,7 @@ RAG / demo 主路径：
 
 - `backend/scripts/run_shared_backend.sh`
 - `backend/scripts/seed_demo_policy.py`
+- `backend/scripts/run_chat_ai_eval.py`
 - `backend/scripts/run_demo_smoke.py`
 - `docs/REMOTE_SHARED_BACKEND_ZH.md`
 
@@ -379,6 +380,13 @@ cd backend
 ```bash
 cd backend
 ./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000
+```
+
+如果你只想回归 Mingtao 负责的 chat AI orchestration，不想依赖真实 OpenAI 或数据库：
+
+```bash
+cd backend
+./.venv/bin/python scripts/run_chat_ai_eval.py --json-out /tmp/claimmate_chat_ai_eval.json
 ```
 
 如果你本地已经配好真实 `DATABASE_URL`，还可以跑集成测试：

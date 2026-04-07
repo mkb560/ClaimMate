@@ -147,6 +147,7 @@ backend/
   - `ingest_local_policy.py`: ingests a local policy PDF into KB-A for a case
   - `query_local_rag.py`: runs a local RAG question against the vector store
   - `run_demo_eval.py`: runs the fixed local demo/eval suite against known policy PDFs and mixed KB-A + KB-B questions
+  - `run_chat_ai_eval.py`: runs deterministic chat AI orchestration regression checks without calling OpenAI or a live database
   - `run_demo_smoke.py`: runs the end-to-end HTTP smoke path over a live backend (`health -> demo/policies -> seed-policy -> ask -> seed-accident -> case snapshot(room_bootstrap) -> chat/messages -> chat/event`)
   - `seed_demo_policy.py`: seeds one of the fixed demo policy PDFs into KB-A for a chosen case id and exports a JSON summary
   - `seed_accident_demo.py`: seeds a stable accident workflow demo case, generates report/chat artifacts, and exports sample JSON for frontend/demo use
@@ -306,6 +307,7 @@ Use `backend/.env.example` as the template. Current variables:
 - Real-DB integration tests can be run with `DATABASE_URL=... ./.venv/bin/pytest -m integration`
 - Local KB-B indexing requires both a working `DATABASE_URL` and an `OPENAI_API_KEY` with available quota
 - The local demo/eval suite can be run with `DATABASE_URL=... OPENAI_API_KEY=... ./.venv/bin/python scripts/run_demo_eval.py`
+- The deterministic chat AI orchestration eval can be run with `./.venv/bin/python scripts/run_chat_ai_eval.py`
 - The live HTTP smoke path can be run with `./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000` or against the current shared backend base URL
 - The policy demo seed helper can be run with `DATABASE_URL=... OPENAI_API_KEY=... ./.venv/bin/python scripts/seed_demo_policy.py --case-id allstate-change-2025-05`
 - A short-term remote sharing workflow is documented in `docs/REMOTE_SHARED_BACKEND_ZH.md`, and `backend/scripts/run_shared_backend.sh` can be used to expose the local backend through ngrok for teammates

@@ -179,7 +179,18 @@ Summary: 9/9 passed
 
 说明现在这套固定 demo 题集还是通的。
 
-## 8. 跑一轮真实 HTTP smoke
+## 8. 跑 Chat AI deterministic eval
+
+如果你只想检查 Mingtao 负责的 chat AI orchestration，不想依赖真实 OpenAI 或数据库，可以跑：
+
+```bash
+cd backend
+./.venv/bin/python scripts/run_chat_ai_eval.py --json-out /tmp/claimmate_chat_ai_eval.json
+```
+
+这条 eval 会覆盖空 `@AI`、stage 1 / stage 3 回答风格、非 mention dispute trigger、deadline fallback 和 policy indexed proactive response。
+
+## 9. 跑一轮真实 HTTP smoke
 
 如果你想确认 live backend 这条完整演示路径都还是通的，可以直接跑：
 
@@ -202,7 +213,7 @@ cd backend
 
 如果你想直接打 shared backend，把 `--base-url` 换成当前 ngrok URL 就行。
 
-## 9. 当前推荐 demo 题
+## 10. 当前推荐 demo 题
 
 最稳的题集和讲解顺序已经整理在：
 
