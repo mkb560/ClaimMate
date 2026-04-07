@@ -25,6 +25,10 @@
   如何把你本机后端通过公网共享给远程队友。
 - `RUN_DEMO_ZH.md`
   本地从零启动 demo 的完整说明，也包含 `run_demo_smoke.py` 的使用方式。
+- `BUSINESS_MILESTONE_1_VIDEO_SCRIPT.md`
+  Business Milestone 1 动画视频英文讲稿与 PPT 展示建议。
+- `TECHNICAL_MILESTONE_1_VIDEO_SCRIPT.md`
+  Technical Milestone 1 录屏英文脚本，可直接照着演示后端 AI demo。
 - `KE_API_CONTRACT_ZH.md`
   给 Ke 的最小 API 契约。
 - `KE_WU_HANDOFF_ZH.md`
