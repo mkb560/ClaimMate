@@ -75,7 +75,7 @@ Policy Q&A
 ### Eval / Smoke / Docs
 
 - `backend/scripts/run_demo_smoke.py` 已覆盖 live backend 路径：`health -> demo/policies -> seed-policy -> ask -> seed-accident -> case snapshot(room_bootstrap) -> chat/messages -> chat/event`。
-- Backend CI 已跑 `pytest`，并额外运行 deterministic chat AI eval。
+- Backend CI 配置为运行 `pytest`，并额外运行 deterministic chat AI eval。
 - `docs/` 已包含 demo、shared backend、frontend API examples、AI chat behavior contract、progress report 等文档。
 
 ## 6. 未实现 / 后续计划

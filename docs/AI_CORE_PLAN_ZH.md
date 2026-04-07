@@ -49,7 +49,7 @@ Mingtao 当前负责 ClaimMate 的 AI 核心部分：双知识源 RAG、dispute 
 | Chunking | `tiktoken` | 简单直接的 token-aware chunking |
 | PDF 解析 | `pdfplumber` + `pypdf` fallback | 兼顾表格和普通文本 |
 | HTML 解析 | `html2text` | 对 KB-B 的 HTML 资料已经够用 |
-| 存储 | AWS S3 | policy PDF 与可选 KB-B 备份 |
+| 存储 | 本地文件存储 + optional AWS S3 | 当前 demo/app route 主要使用 `.local_data/policies/`；S3 仅作为 object-storage ingestion 支持和 KB-B backup 可选项 |
 
 **当前栈：**
 
@@ -225,7 +225,7 @@ ADD COLUMN last_deadline_alert_at TIMESTAMPTZ NULL;
 **语义：**
 
 - `claim_notice_at`：claim notice / report 提交或被 insurer 收到的时间
-- `proof_of_claim_at`：触发 40 天 decision clock 的材料提交时间
+- `proof_of_claim_at`：触发 40-day decision clock 的材料提交时间
 - `last_deadline_alert_at`：避免 24 小时内重复提醒的 cooldown 时间
 
 ### deadline integration contract
@@ -237,7 +237,7 @@ ADD COLUMN last_deadline_alert_at TIMESTAMPTZ NULL;
 - 真实的 `cases` 表存在
 - 上面的三个时间字段已经被创建或迁移进去
 - 传给 AI 函数的 `case_id` 能够正确映射到 `cases.id`
-- case 删除时，除了清 DB 行，也要清理关联的 vector rows、chat messages、S3 / 本地文件对象
+- case 删除时，当前会清 DB rows、chat messages 和 vector rows；S3 / 本地 policy file lifecycle 属于后续协调项
 
 ---
 
@@ -429,21 +429,24 @@ California requires acknowledgment within 15 days. [S2]
 
 ### 当前 MVP 模型
 
-- `claim_notice_at` 触发 15 天 acknowledgment reminder
-- `proof_of_claim_at` 触发 40 天 decision reminder
+- `claim_notice_at` 触发 15-calendar-day acknowledgment reminder
+- `proof_of_claim_at` 触发 40-day decision reminder
 - reminder 是被动的、信息型的
 - 通过 `last_deadline_alert_at` 做 24 小时冷却
+- 用户用 `@AI` 明确询问 deadline / timeline / due date 时，会走显式 Deadline Explainer
 
 ### 当前使用的 California 时间模型
 
-- claim notice date 后 15 天提醒
-- proof-of-claim date 后 40 天提醒
+- claim notice date 后 15 calendar days 提醒
+- proof-of-claim date 后 40 days 提醒
 
 AI **不会**从聊天文本中自动推断法律日期，也**不会**在日期可能不完整时做强结论。
 
-### 当前 reminder 风格
+### 当前 reminder / explainer 风格
 
 当前 deadline reminder 会明确说明：它是基于已保存的 case dates 生成的，如果日期不完整，用户需要先更新。
+
+显式 Deadline Explainer 也只基于已保存的 `claim_notice_at` / `proof_of_claim_at` 计算窗口；它不更新 `last_deadline_alert_at`，因此不会影响被动 deadline reminder 的 cooldown。
 
 ---
 
@@ -482,10 +485,11 @@ def determine_stage(participants: list[Participant], invite_sent: bool) -> ChatS
 1. 检测 `@AI` 或 `@ai`
 2. 提取 mention 之后的问题文本
 3. 如果文本为空，让用户补问题
-4. 先跑 dispute detection
-5. 如果 dispute confirmed，就走 dispute-focused RAG
-6. 否则走普通 policy question RAG
-7. 如果在 Stage 3，回答前加 `For reference:`
+4. 如果是明确 deadline / timeline / due date 问题，走 Deadline Explainer
+5. 否则跑 dispute detection
+6. 如果 dispute confirmed，就走 dispute-focused RAG，并附 next-step helper
+7. 否则走普通 policy question RAG
+8. 如果在 Stage 3，回答前加 `For reference:`
 
 ### 非 mention 行为
 
