@@ -18,7 +18,7 @@ DECISION_WINDOW_DAYS = 40
 # - claim_notice_at TIMESTAMPTZ NULL
 # - proof_of_claim_at TIMESTAMPTZ NULL
 # - last_deadline_alert_at TIMESTAMPTZ NULL
-# This module intentionally uses raw SQL so it can integrate before a shared Case ORM model exists.
+# This module intentionally keeps a raw-SQL boundary so AI logic stays decoupled from app ORM changes.
 
 
 @dataclass(slots=True)

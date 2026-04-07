@@ -25,6 +25,18 @@ class DisputeClassification:
     rationale: str = ""
 
 
+def _parse_json_payload(raw_content: str | None) -> dict[str, object]:
+    if not raw_content:
+        return {}
+    try:
+        payload = json.loads(raw_content)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
+
 async def classify_dispute(
     message_text: str,
     *,
@@ -48,7 +60,7 @@ async def classify_dispute(
         ],
         max_completion_tokens=150,
     )
-    payload = json.loads(response.choices[0].message.content or "{}")
+    payload = _parse_json_payload(response.choices[0].message.content)
     dispute_type = str(payload.get("dispute_type", "NOT_DISPUTE")).upper()
     if dispute_type not in STATUTE_BY_DISPUTE_TYPE:
         dispute_type = "NOT_DISPUTE"

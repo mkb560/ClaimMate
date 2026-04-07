@@ -33,3 +33,9 @@ jobs:
           OPENAI_API_KEY: test-key
           DATABASE_URL: postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate
         run: pytest
+
+      - name: Run chat AI deterministic eval
+        env:
+          OPENAI_API_KEY: test-key
+          DATABASE_URL: postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate
+        run: python scripts/run_chat_ai_eval.py --json-out /tmp/claimmate_chat_ai_eval.json

@@ -22,6 +22,7 @@ Mingtao 当前负责 ClaimMate 的 AI 核心部分：双知识源 RAG、dispute 
 - Stage 1 / 2 / 3 群聊 AI 行为
 - 固定 disclaimer + inline citations
 - 第二主线的事故流程共享契约与报告 payload 中间层
+- 固定 demo/eval 与 smoke 脚本，用来保护 AI/RAG/chat 行为不回退
 
 **明确不在当前 Phase 1 范围内的内容：**
 
@@ -29,7 +30,7 @@ Mingtao 当前负责 ClaimMate 的 AI 核心部分：双知识源 RAG、dispute 
 - 多 AI provider 抽象层
 - DashScope / Qwen 相关部署逻辑
 - 生产级别的 CCPA retention / observability 方案
-- 大而全的 evaluation harness
+- 生产级、大而全的 evaluation harness（当前只保留轻量 deterministic demo/eval）
 
 ---
 
@@ -64,7 +65,17 @@ backend/
 ├── models/
 │   ├── __init__.py
 │   ├── ai_types.py
-│   └── accident_types.py
+│   ├── accident_types.py
+│   └── case_orm.py
+├── app/
+│   ├── case_service.py
+│   ├── demo_case_service.py
+│   ├── demo_policy_service.py
+│   ├── policy_service.py
+│   └── routers/
+│       ├── health.py
+│       ├── policy_ask.py
+│       └── cases_and_accident.py
 ├── ai/
 │   ├── __init__.py
 │   ├── clients.py
@@ -111,6 +122,13 @@ backend/
 │       ├── stage_prompts.py
 │       ├── mention_handler.py
 │       └── chat_ai_service.py
+│
+├── scripts/
+│   ├── run_demo_eval.py
+│   ├── run_chat_ai_eval.py
+│   ├── run_demo_smoke.py
+│   ├── seed_demo_policy.py
+│   └── seed_accident_demo.py
 │
 └── tests/
 ```
@@ -163,9 +181,9 @@ Policy PDF / Regulatory HTML or PDF
 
 ### `vector_documents`
 
-当前 AI scaffold 假定有如下向量表。推荐的最终目标是让 `vector_documents.case_id` 和 `cases.id` 保持完全一致；如果 Ke 最后使用 UUID 主键，则这里也应该最终改成 `UUID REFERENCES cases(id) ON DELETE CASCADE`。
+当前 AI scaffold 使用如下向量表。推荐的最终目标仍然是让 `vector_documents.case_id` 和 app-layer `cases.id` 保持完全一致；如果后续团队决定把 `cases.id` 改成 UUID 主键，则这里也应该最终改成 `UUID REFERENCES cases(id) ON DELETE CASCADE`。
 
-当前之所以还是字符串，是为了不让 AI scaffold 被 app ORM 层尚未完成这件事卡住。
+当前之所以仍是字符串，是为了让 AI/RAG、demo case、脚本和 app-layer HTTP flow 在课程 demo 阶段保持低耦合、易调试。
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -209,14 +227,14 @@ ADD COLUMN last_deadline_alert_at TIMESTAMPTZ NULL;
 
 ### deadline integration contract
 
-当前 AI module 还没有共享 `Case` ORM model。`deadline_checker.py` 故意先用原始 SQL 访问 `cases`，这样可以在 Ke 的 ORM layer 完成前先不阻塞 AI。
+当前 app layer 已经有最小 `Case` ORM/table，并在本地/dev bootstrap 中创建 deadline 相关字段。`deadline_checker.py` 仍然保留原始 SQL 边界，这样可以继续和 app route、脚本、未来 migration 层低耦合。
 
-这意味着 app layer 需要保证：
+这意味着 app layer 仍需要保证：
 
 - 真实的 `cases` 表存在
-- 上面的三个时间字段已经被迁移进去
-- 传给 AI 函数的 `case_id` 最终能够正确映射到 `cases.id`
-- case 删除时，除了清 DB 行，也要清理关联的 S3 / 文件对象
+- 上面的三个时间字段已经被创建或迁移进去
+- 传给 AI 函数的 `case_id` 能够正确映射到 `cases.id`
+- case 删除时，除了清 DB 行，也要清理关联的 vector rows、chat messages、S3 / 本地文件对象
 
 ---
 
@@ -603,25 +621,29 @@ pytest-asyncio
 
 - stage routing
 - dispute keyword filtering
+- semantic dispute fallback behavior
 - deadline calculation
+- deadline message formatting / cooldown behavior
 - `@AI` mention extraction
 - citation parsing / fallback
 - chat service routing behavior
+- deterministic chat AI eval
 - accident payload contract
 - main upload / ask API
+- demo seed / smoke helpers
 
 当前本地验证命令：
 
 ```bash
 cd backend
-./.venv/bin/pytest
+./.venv/bin/pytest -q
+./.venv/bin/python scripts/run_chat_ai_eval.py --json-out /tmp/claimmate_chat_ai_eval.json
+./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000
 ```
 
-当前仓库最近一轮预期结果：
+不要在文档里写死旧的测试数量；以本地 `pytest` / CI 输出为准。当前 Backend CI 也会运行 deterministic chat AI eval，用来保护 Mingtao 负责的 chat behavior 不回退。
 
-```text
-37 passed
-```
+`run_demo_smoke.py` 需要一个正在运行的本地或 shared backend；`run_chat_ai_eval.py` 不依赖真实 OpenAI 调用或 live DB。
 
 ---
 
@@ -629,25 +651,29 @@ cd backend
 
 ### Ke Wu / app integration
 
-- 把 `init_engine(engine)` 和完整 bootstrap 接进 FastAPI 启动
-- 决定最终 `cases.id` 类型，并和 `vector_documents.case_id` 对齐
-- 给 `cases` 加上 deadline 相关字段
-- 把第二主线的 `Stage A / Stage B / report` 数据流接成真实 API
-- 把：
-  - `ingest_policy(...)`
-  - `answer_policy_question(...)`
-  - `handle_chat_event(...)`
-  - `on_claim_dates_updated(...)`
-  接到 app layer route / webhook / chat pipeline
-- case 删除时清理相关的 S3 / 本地文件对象
+当前已完成：
+
+- FastAPI app bootstrap、router include、CORS 与健康检查
+- 最小 `cases` ORM/table、deadline fields、本地/dev bootstrap
+- policy upload / ask / demo seed / policy status routes
+- Stage A / Stage B / report / claim-dates routes
+- chat event/messages persistence 与 `room_bootstrap`
+- demo case delete cleanup for DB rows, vectors, and chat messages
+
+仍需协调或后续实现：
+
+- 生产级 migration 与最终 case ID/type 决策
+- 生产 deployment、auth、invite link、WebSocket room、Stripe
+- 外部 S3 / 本地 policy file lifecycle 的最终清理策略
+- shared API contract 变更时同步 tests、docs、frontend handoff
 
 ### Mingtao 当前还能继续做什么
 
-- 增加 live evaluation harness
-- 从 `ensure_vector_schema()` 过渡到正式 migration 文件
-- 增加对本地 Postgres + `pgvector` 的集成测试
-- 在真实 policy / chat 数据稳定后进一步调 prompts
-- 在第二主线里继续补 API contract 和 report generator contract
+- 扩展 deterministic eval datasets（`run_demo_eval.py`、`run_chat_ai_eval.py`）
+- 继续补 semantic dispute / deadline / citation regression tests
+- 用真实 demo transcript 调整 prompt、RAG fallback、stage-specific tone
+- 保持 AI behavior contract docs 与实际 chat behavior 同步
+- shared API 影响 AI behavior 时，补短 handoff 文档和 smoke/eval 覆盖
 
 ---
 
@@ -656,7 +682,7 @@ cd backend
 - 当前 MVP 只使用 OpenAI
 - policy ingestion 当前既支持 S3，也支持本地文件
 - KB-B 备份上传到 S3 是可选的
-- 当前 AI scaffold 有意和 Ke 尚未完成的 ORM layer 解耦，所以后面仍可能需要对齐类型
+- AI core 和 app ORM 仍保持低耦合；后续 schema/API 变动需要同步 tests、docs 和 smoke/eval
 - deadline reminder 是信息型的、基于日期字段的，不是从聊天自动推断的
 
 ---
