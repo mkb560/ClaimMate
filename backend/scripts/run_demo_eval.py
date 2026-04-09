@@ -74,6 +74,11 @@ DEMO_EVAL_CASES: tuple[EvalCase, ...] = (
                 expected_substrings=("$965.29",),
                 required_source_types=("kb_a",),
             ),
+            EvalQuestion(
+                question="What are the liability limits, and is rental reimbursement purchased?",
+                expected_substrings=("$50,000 each person", "$100,000 each occurrence", "Rental Reimbursement", "Not purchased"),
+                required_source_types=("kb_a",),
+            ),
         ),
     ),
     EvalCase(
@@ -100,6 +105,11 @@ DEMO_EVAL_CASES: tuple[EvalCase, ...] = (
                 ),
                 required_source_types=("kb_b",),
             ),
+            EvalQuestion(
+                question="What deductible and coverage limit are described for Identity Theft Expenses Coverage?",
+                expected_substrings=("Identity Theft Expenses Coverage", "no deductible", "$25,000"),
+                required_source_types=("kb_a",),
+            ),
         ),
     ),
     EvalCase(
@@ -125,6 +135,11 @@ DEMO_EVAL_CASES: tuple[EvalCase, ...] = (
                     ("investigation", "begin any necessary investigation"),
                 ),
                 required_source_types=("kb_b",),
+            ),
+            EvalQuestion(
+                question="What vehicle and VIN are listed in this verification of insurance?",
+                expected_substrings=("Hyundai Elantra Hybrid", "KMHLN4DJ8RU107842"),
+                required_source_types=("kb_a",),
             ),
         ),
     ),

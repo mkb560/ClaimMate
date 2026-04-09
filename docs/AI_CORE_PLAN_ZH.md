@@ -677,7 +677,7 @@ cd backend
 ### Mingtao 当前还能继续做什么
 
 - 扩展 deterministic eval datasets（`run_demo_eval.py`、`run_chat_ai_eval.py`）
-- 继续补 semantic dispute / deadline / citation regression tests
+- 继续补 semantic dispute / deadline / citation regression tests，并用 demo transcript 收紧 policy fact questions 的 deterministic coverage
 - 用真实 demo transcript 调整 prompt、RAG fallback、stage-specific tone
 - 保持 AI behavior contract docs 与实际 chat behavior 同步
 - shared API 影响 AI behavior 时，补短 handoff 文档和 smoke/eval 覆盖

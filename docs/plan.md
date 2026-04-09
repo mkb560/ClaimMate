@@ -124,7 +124,7 @@ Policy Q&A
 ### Short Term
 
 - Keep `main` stable and push owner work through `mingtao/dev`, `ke/...`, and `lou/...` style branches.
-- Mingtao: Dispute Next-Step Helper 和 Deadline Explainer 已落地；下一步继续扩展 policy fact extraction、citation guard lite、真实 demo transcript 调优和 chat AI regression coverage。
+- Mingtao: Dispute Next-Step Helper、Deadline Explainer、expanded policy fact extraction 和 citation guard lite 已落地；下一步继续做真实 demo transcript 调优和 chat AI regression coverage。
 - Ke: continue from HTTP chat persistence toward WebSocket room/invite-link architecture and production DB migration path.
 - Lou: finish accident form polish, report preview/PDF UX, citation/chat timeline display, and final demo UI polish.
 

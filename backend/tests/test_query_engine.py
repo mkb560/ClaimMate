@@ -140,3 +140,107 @@ async def test_answer_policy_question_prefers_structured_regulatory_rule_without
     assert "15 calendar days" in answer.answer
     assert "acknowledge receipt" in answer.answer
     assert "begin any necessary investigation" in answer.answer
+
+
+async def test_answer_policy_question_prefers_extended_structured_policy_facts_without_embedding(monkeypatch) -> None:
+    async def fake_list_policy_chunks(case_id: str, limit=None):
+        return [
+            RetrievedChunk(
+                source_type="kb_a",
+                chunk_text=(
+                    "Coverage detail for 2024 Hyundai Elantra\n"
+                    "Automobile Liability Insurance Not applicable $1,235.12\n"
+                    "Bodily Injury $50,000 each person\n$100,000 each occurrence\n"
+                    "Property Damage $50,000 each occurrence\n"
+                    "Rental Reimbursement Not purchased*\n"
+                ),
+                document_id="policy_pdf",
+                page_num=2,
+                section="COVERAGE DETAIL",
+                metadata={"source_label": "Your Policy (TEMP_PDF_FILE.pdf)"},
+            )
+        ]
+
+    async def fail_generate_answer(**kwargs):
+        raise AssertionError("Structured policy fact extraction should answer this question before LLM generation.")
+
+    async def fail_embed_query(question: str) -> list[float]:
+        raise AssertionError("Structured policy fact extraction should answer this question before any embedding call.")
+
+    monkeypatch.setattr(query_engine, "_embed_query", fail_embed_query)
+    monkeypatch.setattr(query_engine, "list_policy_chunks", fake_list_policy_chunks)
+    monkeypatch.setattr(query_engine, "_generate_answer", fail_generate_answer)
+
+    answer = await answer_policy_question("demo-case", "What are the liability limits, and is rental reimbursement purchased?")
+
+    assert "$50,000 each person" in answer.answer
+    assert "Rental Reimbursement" in answer.answer
+    assert "Not purchased" in answer.answer
+
+
+async def test_generate_answer_uses_rescue_when_initial_answer_has_no_citations() -> None:
+    responses = iter(
+        [
+            "Your policy includes rental reimbursement.",
+            "The policy lists Rental Reimbursement as Not purchased. [S1]",
+        ]
+    )
+
+    class _FakeCompletions:
+        async def create(self, **kwargs):
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=next(responses)))])
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=_FakeCompletions()))
+    policy_chunk = RetrievedChunk(
+        source_type="kb_a",
+        chunk_text="Rental Reimbursement Not purchased*",
+        document_id="policy_pdf",
+        page_num=2,
+        section="COVERAGE DETAIL",
+        metadata={"source_label": "Your Policy (TEMP_PDF_FILE.pdf)"},
+    )
+
+    answer = await query_engine._generate_answer(
+        question="Does this policy cover rental reimbursement?",
+        policy_chunks=[policy_chunk],
+        regulatory_chunks=[],
+        client=client,
+        system_prompt="test",
+    )
+
+    assert "Not purchased" in answer.answer
+    assert len(answer.citations) == 1
+
+
+async def test_generate_answer_falls_back_to_not_enough_info_when_citations_are_missing_after_rescue() -> None:
+    responses = iter(
+        [
+            "Your policy includes rental reimbursement.",
+            "Still no citations in this answer.",
+        ]
+    )
+
+    class _FakeCompletions:
+        async def create(self, **kwargs):
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=next(responses)))])
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=_FakeCompletions()))
+    policy_chunk = RetrievedChunk(
+        source_type="kb_a",
+        chunk_text="Rental Reimbursement Not purchased*",
+        document_id="policy_pdf",
+        page_num=2,
+        section="COVERAGE DETAIL",
+        metadata={"source_label": "Your Policy (TEMP_PDF_FILE.pdf)"},
+    )
+
+    answer = await query_engine._generate_answer(
+        question="Does this policy cover rental reimbursement?",
+        policy_chunks=[policy_chunk],
+        regulatory_chunks=[],
+        client=client,
+        system_prompt="test",
+    )
+
+    assert query_engine.NOT_ENOUGH_INFO_MESSAGE in answer.answer
+    assert len(answer.citations) == 1

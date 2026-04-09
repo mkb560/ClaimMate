@@ -38,6 +38,28 @@ NOT_FULL_POLICY_RE = re.compile(
     r"not an insurance policy and does not amend, extend or alter the coverage",
     re.IGNORECASE,
 )
+VEHICLE_LINE_RE = re.compile(
+    r"\b(20\d{2}\s+[A-Za-z]+(?:\s+[A-Za-z]+){0,3})\s+([A-HJ-NPR-Z0-9]{17})\s+\$",
+    re.IGNORECASE,
+)
+VEHICLE_LABEL_RE = re.compile(r"Vehicle:\s*(20\d{2}\s+[A-Za-z0-9 -]+)", re.IGNORECASE)
+VIN_LABEL_RE = re.compile(r"(?:Vehicle identification number|VIN)\s*:?\s*([A-HJ-NPR-Z0-9]{17})", re.IGNORECASE)
+LIABILITY_LIMITS_RE = re.compile(
+    r"Automobile Liability Insurance.*?Bodily Injury\s+(\$[0-9,]+ each person)\s+(\$[0-9,]+ each occurrence)"
+    r".*?Property Damage\s+(\$[0-9,]+ each occurrence)",
+    re.IGNORECASE | re.DOTALL,
+)
+COLLISION_STATUS_RE = re.compile(r"Auto Collision Insurance\s+([^\n]+)", re.IGNORECASE)
+COMPREHENSIVE_STATUS_RE = re.compile(r"Auto Comprehensive Insurance\s+([^\n]+)", re.IGNORECASE)
+RENTAL_STATUS_RE = re.compile(r"Rental Reimbursement\s+([^\n]+)", re.IGNORECASE)
+IDENTITY_THEFT_LIMIT_RE = re.compile(
+    r"Identity Theft Expenses Coverage.*?up to a coverage limit of\s*(\$[0-9,]+)",
+    re.IGNORECASE | re.DOTALL,
+)
+IDENTITY_THEFT_DEDUCTIBLE_RE = re.compile(
+    r"Identity Theft Expenses Coverage.*?\b(no deductible|\$[0-9,]+ deductible)\b",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 @dataclass(slots=True)
@@ -52,6 +74,10 @@ class PolicyFact:
 
 def _normalize_space(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _clean_fact_value(text: str) -> str:
+    return _normalize_space(text.replace("*", "").rstrip("."))
 
 
 def _with_indefinite_article(text: str) -> str:
@@ -71,7 +97,7 @@ def _find_matches(pattern: re.Pattern[str], chunks: Sequence[RetrievedChunk]) ->
 def _make_fact(key: str, value: str, chunk: RetrievedChunk, excerpt: str) -> PolicyFact:
     return PolicyFact(
         key=key,
-        value=_normalize_space(value),
+        value=_clean_fact_value(value),
         page_num=chunk.page_num,
         section=chunk.section,
         source_label=source_label_for_chunk(chunk),
@@ -167,6 +193,56 @@ def extract_policy_facts(chunks: Sequence[RetrievedChunk]) -> dict[str, list[Pol
             _make_fact("insurer", match.group(1), chunk, match.group(0))
         )
 
+    for chunk, match in _find_matches(VEHICLE_LINE_RE, chunks):
+        facts.setdefault("vehicle_description", []).append(
+            _make_fact("vehicle_description", match.group(1), chunk, match.group(0))
+        )
+        facts.setdefault("vehicle_vin", []).append(
+            _make_fact("vehicle_vin", match.group(2), chunk, match.group(0))
+        )
+
+    for chunk, match in _find_matches(VEHICLE_LABEL_RE, chunks):
+        facts.setdefault("vehicle_description", []).append(
+            _make_fact("vehicle_description", match.group(1), chunk, match.group(0))
+        )
+
+    for chunk, match in _find_matches(VIN_LABEL_RE, chunks):
+        facts.setdefault("vehicle_vin", []).append(
+            _make_fact("vehicle_vin", match.group(1), chunk, match.group(0))
+        )
+
+    for chunk, match in _find_matches(LIABILITY_LIMITS_RE, chunks):
+        bodily_injury = f"{match.group(1)} / {match.group(2)}"
+        property_damage = match.group(3)
+        facts.setdefault("liability_limits", []).append(
+            _make_fact(
+                "liability_limits",
+                f"Bodily Injury Liability {bodily_injury}; Property Damage Liability {property_damage}",
+                chunk,
+                match.group(0),
+            )
+        )
+
+    for key, pattern in (
+        ("collision_coverage", COLLISION_STATUS_RE),
+        ("comprehensive_coverage", COMPREHENSIVE_STATUS_RE),
+        ("rental_reimbursement", RENTAL_STATUS_RE),
+    ):
+        for chunk, match in _find_matches(pattern, chunks):
+            facts.setdefault(key, []).append(
+                _make_fact(key, match.group(1), chunk, match.group(0))
+            )
+
+    for chunk, match in _find_matches(IDENTITY_THEFT_LIMIT_RE, chunks):
+        facts.setdefault("identity_theft_limit", []).append(
+            _make_fact("identity_theft_limit", match.group(1), chunk, match.group(0))
+        )
+
+    for chunk, match in _find_matches(IDENTITY_THEFT_DEDUCTIBLE_RE, chunks):
+        facts.setdefault("identity_theft_deductible", []).append(
+            _make_fact("identity_theft_deductible", match.group(1), chunk, match.group(0))
+        )
+
     for chunk in chunks:
         if OPTIONAL_COVERAGE_RE.search(chunk.chunk_text):
             facts.setdefault("optional_coverage", []).append(
@@ -222,10 +298,31 @@ def detect_requested_policy_fact_keys(question: str) -> set[str]:
         keys.add("discount_total")
     if "optional coverage" in lowered or "highlight" in lowered or "identity theft" in lowered:
         keys.add("optional_coverage")
+    if "identity theft" in lowered and ("limit" in lowered or "deductible" in lowered or "coverage" in lowered):
+        keys.update({"identity_theft_limit", "identity_theft_deductible"})
     if "what kind of" in lowered or "renewal" in lowered or "packet" in lowered or "document" in lowered:
         keys.add("document_type")
-    if "full insurance policy" in lowered or "verification of insurance" in lowered:
+    if "full insurance policy" in lowered or (
+        "verification of insurance" in lowered
+        and any(term in lowered for term in ("only", "full", "document", "policy"))
+    ):
         keys.update({"document_type", "not_full_policy"})
+    if "rental reimbursement" in lowered:
+        keys.add("rental_reimbursement")
+    if "collision" in lowered:
+        keys.add("collision_coverage")
+        if "deductible" in lowered:
+            keys.add("collision_deductible")
+    if "comprehensive" in lowered:
+        keys.add("comprehensive_coverage")
+        if "deductible" in lowered:
+            keys.add("comprehensive_deductible")
+    if "liability" in lowered and ("limit" in lowered or "limits" in lowered or "coverage" in lowered):
+        keys.add("liability_limits")
+    if "vehicle" in lowered:
+        keys.add("vehicle_description")
+    if re.search(r"\bvin\b", lowered) or "vehicle identification number" in lowered:
+        keys.add("vehicle_vin")
     return keys
 
 
@@ -334,6 +431,97 @@ def _build_fact_answer(requested_keys: set[str], facts: dict[str, list[PolicyFac
     if "optional_coverage" in remaining_keys and optional_coverage:
         lines.append(f"The optional coverage highlighted in this document is {optional_coverage.value}. [{ref_for(optional_coverage)}]")
         remaining_keys.remove("optional_coverage")
+
+    collision_coverage = _first_fact(facts, "collision_coverage")
+    if "collision_coverage" in remaining_keys and collision_coverage:
+        lines.append(
+            f"Auto Collision Insurance is listed as {collision_coverage.value}. [{ref_for(collision_coverage)}]"
+        )
+        remaining_keys.remove("collision_coverage")
+
+    if "collision_deductible" in remaining_keys and collision_coverage:
+        if collision_coverage.value.lower() == "not purchased":
+            lines.append(
+                f"Auto Collision Insurance is listed as {collision_coverage.value}, so no collision deductible amount is shown. "
+                f"[{ref_for(collision_coverage)}]"
+            )
+        else:
+            lines.append(
+                f"Auto Collision Insurance is listed as {collision_coverage.value}. [{ref_for(collision_coverage)}]"
+            )
+        remaining_keys.remove("collision_deductible")
+
+    comprehensive_coverage = _first_fact(facts, "comprehensive_coverage")
+    if "comprehensive_coverage" in remaining_keys and comprehensive_coverage:
+        lines.append(
+            f"Auto Comprehensive Insurance is listed as {comprehensive_coverage.value}. "
+            f"[{ref_for(comprehensive_coverage)}]"
+        )
+        remaining_keys.remove("comprehensive_coverage")
+
+    if "comprehensive_deductible" in remaining_keys and comprehensive_coverage:
+        if comprehensive_coverage.value.lower() == "not purchased":
+            lines.append(
+                f"Auto Comprehensive Insurance is listed as {comprehensive_coverage.value}, so no comprehensive deductible amount is shown. "
+                f"[{ref_for(comprehensive_coverage)}]"
+            )
+        else:
+            lines.append(
+                f"Auto Comprehensive Insurance is listed as {comprehensive_coverage.value}. "
+                f"[{ref_for(comprehensive_coverage)}]"
+            )
+        remaining_keys.remove("comprehensive_deductible")
+
+    rental_reimbursement = _first_fact(facts, "rental_reimbursement")
+    if "rental_reimbursement" in remaining_keys and rental_reimbursement:
+        lines.append(
+            f"The Coverage Detail section lists Rental Reimbursement as {rental_reimbursement.value}. "
+            f"[{ref_for(rental_reimbursement)}]"
+        )
+        remaining_keys.remove("rental_reimbursement")
+
+    liability_limits = _first_fact(facts, "liability_limits")
+    if "liability_limits" in remaining_keys and liability_limits:
+        lines.append(f"The listed liability limits are {liability_limits.value}. [{ref_for(liability_limits)}]")
+        remaining_keys.remove("liability_limits")
+
+    vehicle_description = _first_fact(facts, "vehicle_description")
+    vehicle_vin = _first_fact(facts, "vehicle_vin")
+    if {"vehicle_description", "vehicle_vin"} <= remaining_keys and vehicle_description and vehicle_vin:
+        lines.append(
+            f"The listed vehicle is {vehicle_description.value}, and the VIN is {vehicle_vin.value}. "
+            f"[{ref_for(vehicle_description)}][{ref_for(vehicle_vin)}]"
+        )
+        remaining_keys -= {"vehicle_description", "vehicle_vin"}
+    else:
+        if "vehicle_description" in remaining_keys and vehicle_description:
+            lines.append(f"The listed vehicle is {vehicle_description.value}. [{ref_for(vehicle_description)}]")
+            remaining_keys.remove("vehicle_description")
+        if "vehicle_vin" in remaining_keys and vehicle_vin:
+            lines.append(f"The VIN listed in the document is {vehicle_vin.value}. [{ref_for(vehicle_vin)}]")
+            remaining_keys.remove("vehicle_vin")
+
+    identity_theft_limit = _first_fact(facts, "identity_theft_limit")
+    identity_theft_deductible = _first_fact(facts, "identity_theft_deductible")
+    if {"identity_theft_limit", "identity_theft_deductible"} <= remaining_keys and identity_theft_limit and identity_theft_deductible:
+        lines.append(
+            f"Identity Theft Expenses Coverage is described as having {identity_theft_deductible.value} and a coverage limit of "
+            f"{identity_theft_limit.value}. [{ref_for(identity_theft_limit)}]"
+        )
+        remaining_keys -= {"identity_theft_limit", "identity_theft_deductible"}
+    else:
+        if "identity_theft_limit" in remaining_keys and identity_theft_limit:
+            lines.append(
+                f"Identity Theft Expenses Coverage is described as having a coverage limit of {identity_theft_limit.value}. "
+                f"[{ref_for(identity_theft_limit)}]"
+            )
+            remaining_keys.remove("identity_theft_limit")
+        if "identity_theft_deductible" in remaining_keys and identity_theft_deductible:
+            lines.append(
+                f"Identity Theft Expenses Coverage is described as having {identity_theft_deductible.value}. "
+                f"[{ref_for(identity_theft_deductible)}]"
+            )
+            remaining_keys.remove("identity_theft_deductible")
 
     if not lines or remaining_keys:
         return None

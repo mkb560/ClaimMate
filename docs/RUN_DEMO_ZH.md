@@ -174,10 +174,10 @@ cd backend
 如果看到：
 
 ```text
-Summary: 9/9 passed
+Summary: X/Y passed
 ```
 
-说明现在这套固定 demo 题集还是通的。
+并且没有失败项，说明现在这套固定 demo 题集还是通的。
 
 ## 8. 跑 Chat AI deterministic eval
 

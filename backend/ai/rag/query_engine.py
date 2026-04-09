@@ -112,7 +112,24 @@ async def _generate_answer(
         )
         if not _is_not_enough_info(rescued_answer):
             raw_answer = rescued_answer
-    citations = citations_from_answer(raw_answer, source_index) or fallback_citations(all_chunks)
+
+    citations = citations_from_answer(raw_answer, source_index)
+    if not _is_not_enough_info(raw_answer) and not citations:
+        rescued_answer = await _generate_rescue_answer(
+            question=question,
+            source_index=source_index,
+            client=openai_client,
+        )
+        rescued_citations = citations_from_answer(rescued_answer, source_index)
+        if not _is_not_enough_info(rescued_answer) and rescued_citations:
+            raw_answer = rescued_answer
+            citations = rescued_citations
+        else:
+            raw_answer = NOT_ENOUGH_INFO_MESSAGE
+            citations = fallback_citations(all_chunks)
+    elif not citations:
+        citations = fallback_citations(all_chunks)
+
     return AnswerResponse(
         answer=_normalize_answer(raw_answer),
         citations=citations,

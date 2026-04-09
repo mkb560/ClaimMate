@@ -123,3 +123,89 @@ def test_answer_structured_policy_question_handles_discount_without_false_policy
 
     assert answer is not None
     assert "$965.29" in answer.answer
+
+
+def test_answer_structured_policy_question_handles_liability_limits_and_rental_reimbursement() -> None:
+    chunks = [
+        RetrievedChunk(
+            source_type="kb_a",
+            chunk_text=(
+                "Coverage detail for 2024 Hyundai Elantra\n"
+                "Coverage Limits Deductible Premium\n"
+                "Automobile Liability Insurance Not applicable $1,235.12\n"
+                "Bodily Injury $50,000 each person\n$100,000 each occurrence\n"
+                "Property Damage $50,000 each occurrence\n"
+                "Auto Collision Insurance Not purchased*\n"
+                "Auto Comprehensive Insurance Not purchased*\n"
+                "Rental Reimbursement Not purchased*\n"
+            ),
+            document_id="policy_pdf",
+            page_num=2,
+            section="COVERAGE DETAIL",
+            metadata={"source_label": "Your Policy (TEMP_PDF_FILE.pdf)"},
+        )
+    ]
+
+    answer = answer_structured_policy_question(
+        "What are the liability limits, and is rental reimbursement purchased?",
+        chunks,
+    )
+
+    assert answer is not None
+    assert "$50,000 each person" in answer.answer
+    assert "$100,000 each occurrence" in answer.answer
+    assert "Rental Reimbursement as Not purchased" in answer.answer
+
+
+def test_answer_structured_policy_question_handles_vehicle_and_vin() -> None:
+    chunks = [
+        RetrievedChunk(
+            source_type="kb_a",
+            chunk_text=(
+                "Vehicle information\n"
+                "Vehicle: 2024 HYUNDAI ELANTRA HYBRID\n"
+                "Vehicle identification number: KMHLN4DJ8RU107842\n"
+            ),
+            document_id="policy_pdf",
+            page_num=1,
+            section="VEHICLE INFORMATION",
+            metadata={"source_label": "Your Policy (Verification of Insurance.pdf)"},
+        )
+    ]
+
+    answer = answer_structured_policy_question(
+        "What vehicle and VIN are listed in this verification of insurance?",
+        chunks,
+    )
+
+    assert answer is not None
+    assert "2024 HYUNDAI ELANTRA HYBRID" in answer.answer
+    assert "KMHLN4DJ8RU107842" in answer.answer
+
+
+def test_answer_structured_policy_question_handles_identity_theft_limit_and_deductible() -> None:
+    chunks = [
+        RetrievedChunk(
+            source_type="kb_a",
+            chunk_text=(
+                "Allstate Identity Theft Expenses Coverage\n"
+                "If you are currently receiving the Good Driver discount, you can purchase Identity Theft Expenses Coverage for "
+                "just $15 per policy period and no deductible. The cost is $20 per policy period for those without the Good Driver "
+                "discount. With this coverage, we'll reimburse you for covered expenses you incur to help restore your identity, "
+                "up to a coverage limit of $25,000.\n"
+            ),
+            document_id="policy_pdf",
+            page_num=1,
+            section="OPTIONAL COVERAGE",
+            metadata={"source_label": "Your Policy (TEMP_PDF_FILE 2.pdf)"},
+        )
+    ]
+
+    answer = answer_structured_policy_question(
+        "What deductible and coverage limit are described for Identity Theft Expenses Coverage?",
+        chunks,
+    )
+
+    assert answer is not None
+    assert "no deductible" in answer.answer.lower()
+    assert "$25,000" in answer.answer

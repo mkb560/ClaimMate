@@ -106,7 +106,7 @@ python scripts/run_demo_eval.py --json-out /tmp/claimmate_demo_eval.json
 - 如果你想强制替换其中某一份 policy，可以继续用 `--ingest-policy CASE_ID=/absolute/path/to/policy.pdf`
 - 脚本仍然需要可用的 `DATABASE_URL` 和有额度的 `OPENAI_API_KEY`；现在如果缺数据库配置或 OpenAI quota 不足，会给出可读错误，而不是直接抛长 traceback
 
-如果 `9/9 passed`，说明当前 demo 题集还是稳定的。
+如果 `run_demo_eval.py` 最终显示所有题都 passed，说明当前 demo 题集还是稳定的。
 
 如果你只是想现场快速把某个 demo case 准备好，也可以直接跑：
 
