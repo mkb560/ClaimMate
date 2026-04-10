@@ -160,7 +160,10 @@ async def answer_policy_question(case_id: str, question: str, *, client: AsyncOp
         search_kb_b_chunks(query_embedding, top_k=ai_config.rag_top_k_per_source),
     )
 
-    if policy_chunks:
+    # Only attempt structured extraction here for questions that did NOT already
+    # go through the early structured path above (which uses the same full chunk
+    # list and would have returned the same result).
+    if policy_chunks and not is_structured_policy_fact_question(question):
         all_policy_chunks = await list_policy_chunks(case_id, limit=None)
         if structured_answer := answer_structured_policy_question(question, all_policy_chunks):
             structured_answer.answer = _normalize_answer(structured_answer.answer)

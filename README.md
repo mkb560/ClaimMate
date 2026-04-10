@@ -38,6 +38,8 @@ ClaimMate 的完整产品故事有三条主线：
 - 基于 `gpt-5.4-mini` 的 grounded answer generation
 - 引用来源展示（citations）
 - 保单字段的确定性抽取优先于普通生成式回答
+- 当前 deterministic path 已覆盖 policy number / period / insurer、liability limits、rental reimbursement、collision / comprehensive 状态、vehicle + VIN，以及 demo renewal 文档里的 Identity Theft Expenses Coverage limit / deductible
+- 如果第一轮生成回答没有可解析的 inline citations，RAG 会先做一次更窄的 rescue；如果仍然没有 citation，就保守退回 `not enough information`
 
 相关核心代码在：
 
@@ -133,6 +135,7 @@ RAG / demo 主路径：
 
 - `backend/scripts/run_shared_backend.sh`
 - `backend/scripts/seed_demo_policy.py`
+- `backend/scripts/run_demo_eval.py`
 - `backend/scripts/run_chat_ai_eval.py`
 - `backend/scripts/run_demo_smoke.py`
 - `docs/REMOTE_SHARED_BACKEND_ZH.md`
@@ -381,6 +384,15 @@ cd backend
 ```bash
 cd backend
 ./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000
+```
+
+如果你想检查当前固定 demo policy 问题集是否还稳定：
+
+```bash
+cd backend
+DATABASE_URL=postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate \
+OPENAI_API_KEY=... \
+./.venv/bin/python scripts/run_demo_eval.py --json-out /tmp/claimmate_demo_eval.json
 ```
 
 如果你只想回归 Mingtao 负责的 chat AI orchestration，不想依赖真实 OpenAI 或数据库：

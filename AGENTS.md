@@ -112,7 +112,7 @@ backend/
   - `prompt_templates.py`: system prompts, disclaimer, and fallback text
 
 - `backend/ai/policy/`
-  - `fact_extractor.py`: deterministic extraction for common policy facts such as policyholders, policy number, policy period, insurer, policy change, discount totals, optional coverage, and verification-of-insurance detection
+  - `fact_extractor.py`: deterministic extraction for common policy facts such as policyholders, policy number, policy period, insurer, policy change, discount totals, liability limits, rental reimbursement, collision/comprehensive status, vehicle + VIN, optional coverage, identity-theft limit/deductible, and verification-of-insurance detection
   - Structured policy answers are attempted before general LLM generation for supported question types
 
 - `backend/ai/dispute/`
@@ -146,7 +146,7 @@ backend/
   - `index_local_kb_b.py`: indexes local files from `claimmate_rag_docs/` into PostgreSQL + `pgvector`
   - `ingest_local_policy.py`: ingests a local policy PDF into KB-A for a case
   - `query_local_rag.py`: runs a local RAG question against the vector store
-  - `run_demo_eval.py`: runs the fixed local demo/eval suite against known policy PDFs and mixed KB-A + KB-B questions
+  - `run_demo_eval.py`: runs the fixed local demo/eval suite against known policy PDFs and mixed KB-A + KB-B questions, including structured policy-fact questions for liability limits, rental reimbursement, vehicle/VIN, and identity-theft coverage details
   - `run_chat_ai_eval.py`: runs deterministic chat AI orchestration regression checks without calling OpenAI or a live database
   - `run_demo_smoke.py`: runs the end-to-end HTTP smoke path over a live backend (`health -> demo/policies -> seed-policy -> ask -> seed-accident -> case snapshot(room_bootstrap) -> chat/messages -> chat/event`)
   - `seed_demo_policy.py`: seeds one of the fixed demo policy PDFs into KB-A for a chosen case id and exports a JSON summary
@@ -160,9 +160,11 @@ backend/
 - Regulatory/reference materials are treated as **KB-B**
 - Local curated PDFs under `claimmate_rag_docs/` can be indexed as KB-B without downloading remote sources
 - Supported policy-fact questions are answered first through deterministic extraction before falling back to general RAG generation
+- Deterministic policy-fact coverage now includes liability limits, rental reimbursement, collision/comprehensive status, vehicle + VIN, and identity-theft coverage limit/deductible for the built-in demo PDFs
 - `answer_policy_question(case_id, question)` retrieves from both sources and answers with inline `[S#]` citations
 - `answer_dispute_question(...)` narrows regulatory retrieval to dispute-relevant documents and applies stage-specific instructions; chat dispute responses now append a short next-step helper for what happened, what to collect, and what to ask the insurer
 - If the first generation pass returns a grounded fallback response, the RAG layer performs a narrower rescue pass over top snippets before giving up
+- If a generated answer comes back without parseable inline citations, the RAG layer forces one rescue attempt; if citations are still missing, it falls back to a conservative `not enough information` answer instead of returning an uncited grounded answer
 - All final answers append a fixed disclaimer
 - Demo app uploads local PDFs into `backend/.local_data/policies/<case_id>/` before indexing them into KB-A
 - `POST /cases/{case_id}/demo/seed-policy` can seed the 3 fixed demo policies without manual upload, using either the built-in demo case ids or an explicit `policy_key`
