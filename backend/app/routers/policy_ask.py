@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from ai.ingestion.ingest_policy import ingest_local_policy_file
 from ai.rag.query_engine import answer_policy_question
+from app.auth_deps import AuthContext, get_auth_context
+from app.case_access import assert_can_access_case
 from app.case_validation import validate_case_id
 from app.demo_policy_service import get_policy_status, list_demo_policies, list_demo_policy_keys, seed_demo_policy
 from app.deps import ensure_ai_ready, ensure_db_ready
@@ -31,17 +33,31 @@ async def get_demo_policy_catalog() -> dict[str, object]:
 
 
 @router.get("/cases/{case_id}/policy")
-async def get_case_policy_status(case_id: str, request: Request) -> dict[str, object]:
+async def get_case_policy_status(
+    case_id: str,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     ensure_db_ready(request)
     normalized_case_id = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized_case_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized_case_id, ctx)
     return await get_policy_status(normalized_case_id)
 
 
 @router.post("/cases/{case_id}/policy")
-async def upload_policy(case_id: str, request: Request, file: UploadFile = File(...)) -> dict[str, object]:
+async def upload_policy(
+    case_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     normalized_case_id = validate_case_id(case_id)
     ensure_ai_ready(request)
     await case_service.ensure_case(normalized_case_id)
+    await assert_can_access_case(normalized_case_id, ctx)
     saved_path = await save_uploaded_policy(normalized_case_id, file, LOCAL_POLICY_STORAGE_ROOT)
     chunk_count = await ingest_local_policy_file(saved_path, case_id=normalized_case_id)
     return {
@@ -57,9 +73,12 @@ async def seed_demo_policy_for_case(
     case_id: str,
     request: Request,
     body: SeedPolicyBody | None = None,
+    ctx: AuthContext = Depends(get_auth_context),
 ) -> dict[str, object]:
     normalized_case_id = validate_case_id(case_id)
     ensure_ai_ready(request)
+    await case_service.ensure_case(normalized_case_id)
+    await assert_can_access_case(normalized_case_id, ctx)
     seed_request = body or SeedPolicyBody()
     try:
         return await seed_demo_policy(normalized_case_id, seed_request.policy_key)
@@ -81,10 +100,16 @@ async def seed_demo_policy_for_case(
 
 
 @router.post("/cases/{case_id}/ask")
-async def ask_case_question(case_id: str, payload: AskRequest, request: Request) -> dict[str, object]:
+async def ask_case_question(
+    case_id: str,
+    payload: AskRequest,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     normalized_case_id = validate_case_id(case_id)
     ensure_ai_ready(request)
     await case_service.ensure_case(normalized_case_id)
+    await assert_can_access_case(normalized_case_id, ctx)
 
     question = payload.question.strip()
     if not question:

@@ -12,12 +12,13 @@ This document summarizes the current app-layer backend API and gives practical f
 - `backend/app/routers/health.py` exposes `GET /health`.
 - `backend/app/routers/policy_ask.py` exposes policy upload, policy status, demo policy seed, demo policy catalog, and policy Q&A.
 - `backend/app/routers/cases_and_accident.py` exposes case, accident, report, claim-date, chat event, and chat message routes.
+- `backend/app/routers/auth.py`, `invites.py`, and `ws_chat.py` add optional JWT auth, invite links, and a WebSocket room per case. Defaults keep the demo open (`AUTH_MODE=off`). See `docs/AUTH_AND_WEBSOCKET_KE.md`.
 
 ### Startup & database
 
 - On startup, if `DATABASE_URL` is set, the app creates a shared async engine and runs `bootstrap_vector_store`.
 - Bootstrap ensures the `pgvector` extension and `vector_documents` table for RAG.
-- Bootstrap also creates the app-layer `cases` table and the `case_chat_messages` table for local/dev environments.
+- Bootstrap also creates the app-layer `cases` table, `case_chat_messages`, and auth-related tables (`users`, `case_memberships`, `case_invites`) for local/dev environments.
 - `backend/ai/runtime.py` wires vector schema and app-layer schema together.
 
 ### Minimal case model

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ai.config import ai_config
 from ai.runtime import bootstrap_vector_store, create_ai_engine
-from app.routers import cases_and_accident, health, policy_ask
+from app.routers import auth, cases_and_accident, health, invites, policy_ask, ws_chat
 
 
 @asynccontextmanager
@@ -44,5 +44,8 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router)
+app.include_router(invites.router)
 app.include_router(policy_ask.router)
 app.include_router(cases_and_accident.router)
+app.include_router(ws_chat.router)

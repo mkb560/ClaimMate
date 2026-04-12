@@ -27,6 +27,14 @@ class AIConfig(BaseSettings):
     cors_allow_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     database_url: str = ""
 
+    # Auth: JWT + optional access control for case APIs (default off for demo/smoke).
+    # When auth_mode is "required", all /cases/* routes need a valid Bearer token and
+    # case membership (except legacy cases with zero memberships — those return 403).
+    auth_mode: str = "off"  # off | optional | required
+    jwt_secret_key: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_expires_minutes: int = 60 * 24 * 7
+
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     s3_bucket_name: str = ""

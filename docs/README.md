@@ -11,6 +11,8 @@
 5. `YI_FRONTEND_API_EXAMPLE_ZH.md`：前端调用 policy / accident / report / chat API 的示例。
 6. `AI_CORE_PLAN_ZH.md`：Mingtao AI core / RAG / dispute / deadline / chat behavior 子计划。
 7. `AI_CHAT_BEHAVIOR_CONTRACT_ZH.md`：Mingtao 负责的 AI chat 行为契约。
+8. `AUTH_AND_WEBSOCKET_KE.md`：JWT、`AUTH_MODE`、invite、WebSocket 房间（需要时阅读）。
+9. `TEAM_SYNC_AUTH_WEBSOCKET_KE_ZH.md`：**给 Lou / Mingtao 的同步说明**（如何用 Ke 的 auth / invite / WS 更新）。
 
 ## 项目与协作
 
@@ -19,6 +21,7 @@
 - `PROJECT_PROGRESS_AND_STRUCTURE.md`：基于当前代码整理的进度、待办方向与仓库结构。
 - `CONTRIBUTING.md`：团队协作规则、分支规范和本地检查要求。
 - `TEAM_TASKS.md`：当前任务拆分和协作优先级说明。
+- `TEAM_SYNC_AUTH_WEBSOCKET_KE_ZH.md`：Auth / Invite / WebSocket 更新同步（Lou & Mingtao）。
 - `progress_report_en.md`：英文阶段进度报告。
 
 ## Demo 与运行
@@ -30,6 +33,8 @@
 
 ## 接口与行为契约
 
+- `TEAM_SYNC_AUTH_WEBSOCKET_KE_ZH.md`：面向 Lou / Mingtao 的同步与接入手册（与 `AUTH_AND_WEBSOCKET_KE.md` 配套）。
+- `AUTH_AND_WEBSOCKET_KE.md`：JWT 与 `AUTH_MODE`、case membership、invite、WebSocket 房间（Ke 落地说明）。
 - `BACKEND_INTEGRATION_SUMMARY_AND_LOU_GUIDE.md`：当前 app-layer backend API、policy/事故/chat 流程和 Lou 前端接法。
 - `YI_FRONTEND_API_EXAMPLE_ZH.md`：给 Lou 的前端直接调用示例，覆盖 demo policy catalog、policy status、case snapshot、report、chat event/messages。
 - `ACCIDENT_WORKFLOW_CONTRACT_ZH.md`：第二主线 Stage A/B、report payload、chat context 的共享技术契约。
