@@ -482,7 +482,143 @@ function CitationList({ citations }: { citations: Citation[] }) {
 }
 ```
 
-## 9. 事故 / chat 直接可用的 demo case
+## 9. Stage A / Stage B 表单提交
+
+### PATCH Stage A
+
+接口：
+
+```text
+PATCH /cases/{case_id}/accident/stage-a
+```
+
+请求体是 deep-merge 的，所以你只需要传这次改了的字段，不需要传完整对象。字段名对着 `backend/models/accident_types.py` 里的 snake_case 来。
+
+请求体示例：
+
+```json
+{
+  "occurred_at": "2026-04-01T14:30:00Z",
+  "location": { "address": "123 Main St, Los Angeles, CA" },
+  "owner_party": { "role": "owner", "name": "Jane Doe", "phone": "555-1234", "insurer": "Allstate", "policy_number": "123456789" },
+  "other_party": { "role": "other_driver", "name": "John Smith", "phone": "555-5678" },
+  "injuries_reported": false,
+  "police_called": true,
+  "drivable": true,
+  "tow_requested": false,
+  "quick_summary": "Rear-end collision at a red light.",
+  "stage_completed_at": "2026-04-01T15:00:00Z"
+}
+```
+
+成功返回示例：
+
+```json
+{
+  "case_id": "demo-case",
+  "stage_a": { "...merged stage A JSON..." }
+}
+```
+
+### PATCH Stage B
+
+接口：
+
+```text
+PATCH /cases/{case_id}/accident/stage-b
+```
+
+请求体示例：
+
+```json
+{
+  "detailed_narrative": "Stopped at a red light and was hit from behind.",
+  "damage_summary": "Rear bumper cracked, trunk misalignment.",
+  "weather_conditions": "Clear",
+  "road_conditions": "Dry",
+  "police_report_number": "LA-2026-04-0001",
+  "adjuster_name": "Mike Adams",
+  "repair_shop_name": "AutoFix LA",
+  "follow_up_notes": "Waiting for adjuster estimate.",
+  "stage_completed_at": "2026-04-02T10:00:00Z"
+}
+```
+
+成功返回示例：
+
+```json
+{
+  "case_id": "demo-case",
+  "stage_b": { "...merged stage B JSON..." }
+}
+```
+
+## 9.5. 创建 case / 删除 case / claim dates / 读取报告
+
+### 创建 case
+
+```text
+POST /cases
+```
+
+请求体（可选）：
+
+```json
+{ "case_id": "my-custom-id" }
+```
+
+空 body 也行，服务器会自动生成 `case-...` ID。
+
+成功返回：
+
+```json
+{ "case_id": "my-custom-id" }
+```
+
+### 删除 case（demo 清理用）
+
+```text
+DELETE /cases/{case_id}
+```
+
+成功返回 `204 No Content`，会同时删除关联的 vector chunks 和 chat messages。
+
+### 更新 claim dates
+
+```text
+PATCH /cases/{case_id}/claim-dates
+```
+
+请求体：
+
+```json
+{
+  "claim_notice_at": "2026-04-01T10:00:00Z",
+  "proof_of_claim_at": "2026-04-03T10:00:00Z"
+}
+```
+
+这两个日期用于 AI 的 deadline 计算（15-day acknowledgment / 40-day decision window）。
+
+### 读取已生成的事故报告
+
+```text
+GET /cases/{case_id}/accident/report
+```
+
+和 `POST` 不同，`GET` 只读取之前 `POST` 生成并缓存过的报告。如果还没生成过，返回 `404`。
+
+成功返回：
+
+```json
+{
+  "case_id": "demo-case",
+  "report_payload": { "...same as POST response..." },
+  "chat_context": { "...same as POST response..." }
+}
+```
+
+## 10. 事故 / chat 直接可用的 demo case
 
 现在仓库里已经固定了一条事故 demo case：
 
@@ -546,26 +682,27 @@ export async function generateAccidentReport(caseId: string) {
 }
 ```
 
-### 触发 stage 3 chat event
+### 触发 chat event
+
+`sendChatEvent` 需要传入完整的 `ChatEventRequest` payload，不要硬编码在函数里：
 
 ```ts
-export async function sendChatEvent(caseId: string) {
-  const response = await fetch(`/cases/${caseId}/chat/event`, {
+export type ChatEventRequest = {
+  sender_role: string
+  message_text: string
+  participants: Array<{ user_id: string; role: string }>
+  invite_sent: boolean
+  trigger: "MESSAGE" | "PARTICIPANT_JOINED" | "POLICY_INDEXED"
+  metadata?: Record<string, unknown>
+}
+
+export async function sendChatEvent(caseId: string, payload: ChatEventRequest) {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/chat/event`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      sender_role: "owner",
-      message_text: "@AI What is the 15-day acknowledgment rule for a California claim?",
-      participants: [
-        { user_id: "owner-1", role: "owner" },
-        { user_id: "adjuster-1", role: "adjuster" },
-      ],
-      invite_sent: true,
-      trigger: "MESSAGE",
-      metadata: { demo_label: "claim_rule_stage_3" },
-    }),
+    body: JSON.stringify(payload),
   })
 
   if (!response.ok) {
@@ -575,6 +712,22 @@ export async function sendChatEvent(caseId: string) {
 
   return response.json()
 }
+```
+
+调用示例（stage 3 demo）：
+
+```ts
+const result = await sendChatEvent("demo-accident-2026-04", {
+  sender_role: "owner",
+  message_text: "@AI What is the 15-day acknowledgment rule for a California claim?",
+  participants: [
+    { user_id: "owner-1", role: "owner" },
+    { user_id: "adjuster-1", role: "adjuster" },
+  ],
+  invite_sent: true,
+  trigger: "MESSAGE",
+  metadata: { demo_label: "claim_rule_stage_3" },
+})
 ```
 
 ### 写入并读取 chat timeline
@@ -622,7 +775,7 @@ export async function getChatMessages(caseId: string) {
 }
 ```
 
-## 10. 推荐 demo 问题
+## 11. 推荐 demo 问题
 
 如果你要先做固定 demo，可以直接用这些问题：
 
@@ -641,7 +794,7 @@ export async function getChatMessages(caseId: string) {
 - `What is the policy number, policy period, and insurer?`
 - `Does this document say it is a full insurance policy or only verification of insurance?`
 
-## 11. 前端需要注意的错误情况
+## 12. 前端需要注意的错误情况
 
 ### 上传阶段
 
@@ -658,7 +811,7 @@ export async function getChatMessages(caseId: string) {
 
 建议前端统一 toast 或 inline error 文案，不要只在 console 里报错。
 
-## 12. 现阶段最推荐你先做的 UI
+## 13. 现阶段最推荐你先做的 UI
 
 第一版建议你先做：
 

@@ -292,7 +292,7 @@ def detect_requested_policy_fact_keys(question: str) -> set[str]:
         keys.add("policy_period")
     if "insurer" in lowered or "underwritten" in lowered or "company" in lowered or "carrier" in lowered:
         keys.add("insurer")
-    if "change" in lowered:
+    if "policy change" in lowered or "change effective" in lowered or ("change" in lowered and "policy" in lowered):
         keys.update({"policy_change", "change_effective_date"})
     if "discount" in lowered:
         keys.add("discount_total")

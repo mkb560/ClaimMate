@@ -365,6 +365,160 @@ export async function sendChatEvent(caseId: string, payload: ChatEventRequest) {
   return (await response.json()) as ChatEventResponse;
 }
 
+export type ChatMessageRow = {
+  id: string;
+  case_id: string;
+  message_type: "user" | "ai";
+  sender_role: string | null;
+  body_text: string;
+  ai_payload: AIResponsePayload | null;
+  created_at: string;
+};
+
+export type ChatMessagesResponse = {
+  case_id: string;
+  messages: ChatMessageRow[];
+  limit: number;
+  offset: number;
+};
+
+export type PostChatMessageResponse = {
+  case_id: string;
+  response: AIResponsePayload | null;
+};
+
+export async function getChatMessages(
+  caseId: string,
+  limit = 100,
+  offset = 0
+) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  const response = await fetch(
+    `${API_BASE_URL}/cases/${caseId}/chat/messages?${params}`,
+    {
+      method: "GET",
+      cache: "no-store",
+      headers: { ...NGROK_HEADERS },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Load chat messages failed");
+  }
+
+  return (await response.json()) as ChatMessagesResponse;
+}
+
+export async function sendChatMessage(
+  caseId: string,
+  messageText: string,
+  options?: {
+    sender_role?: string;
+    invite_sent?: boolean;
+    participants?: Array<{ user_id: string; role: string }>;
+  }
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/cases/${caseId}/chat/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...NGROK_HEADERS,
+      },
+      body: JSON.stringify({
+        message_text: messageText,
+        sender_role: options?.sender_role ?? "owner",
+        invite_sent: options?.invite_sent ?? false,
+        participants: options?.participants ?? null,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Send chat message failed");
+  }
+
+  return (await response.json()) as PostChatMessageResponse;
+}
+
+export async function createCase(caseId?: string) {
+  const response = await fetch(`${API_BASE_URL}/cases`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...NGROK_HEADERS,
+    },
+    body: JSON.stringify(caseId ? { case_id: caseId } : {}),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Create case failed");
+  }
+
+  return (await response.json()) as { case_id: string };
+}
+
+export async function deleteCase(caseId: string) {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}`, {
+    method: "DELETE",
+    headers: { ...NGROK_HEADERS },
+  });
+
+  if (!response.ok && response.status !== 404) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Delete case failed");
+  }
+}
+
+export async function patchClaimDates(
+  caseId: string,
+  dates: { claim_notice_at?: string | null; proof_of_claim_at?: string | null }
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/cases/${caseId}/claim-dates`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...NGROK_HEADERS,
+      },
+      body: JSON.stringify(dates),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Update claim dates failed");
+  }
+
+  return response.json();
+}
+
+export async function getAccidentReport(caseId: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/cases/${caseId}/accident/report`,
+    {
+      method: "GET",
+      cache: "no-store",
+      headers: { ...NGROK_HEADERS },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.detail || "Load accident report failed");
+  }
+
+  return (await response.json()) as GenerateReportResponse;
+}
+
 export async function seedAccidentDemoCase(caseId: string) {
   const response = await fetch(`${API_BASE_URL}/cases/${caseId}/demo/seed-accident`, {
     method: "POST",
