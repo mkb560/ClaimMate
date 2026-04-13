@@ -45,7 +45,7 @@ This remains the primary demo path. For copy-paste frontend examples, see `docs/
 Important notes:
 
 - `case_id` must match `^[A-Za-z0-9_-]{1,64}$`.
-- Upload/ask calls run `ensure_case`, so the case row is created automatically if missing.
+- Policy upload, demo `seed-policy`, and `ask` run access checks first, then `ensure_case`, so the case row is created automatically when the caller is allowed and the row is missing.
 - `GET /cases/{case_id}/policy` returns `has_policy`, `chunk_count`, `source_label`, `filename`, and optional `demo_policy` metadata.
 - Fixed demo policy case IDs are `allstate-change-2025-05`, `allstate-renewal-2025-08`, and `progressive-verification-2026-03`.
 - For a custom `case_id`, call `POST /cases/{case_id}/demo/seed-policy` with `{"policy_key": "allstate-change" | "allstate-renewal" | "progressive-verification"}`.

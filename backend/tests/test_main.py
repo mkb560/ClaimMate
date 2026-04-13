@@ -41,8 +41,17 @@ def _build_client(monkeypatch, tmp_path: Path) -> TestClient:
     async def fake_bootstrap(engine) -> None:
         return None
 
-    monkeypatch.setattr(main_mod.ai_config, "database_url", "postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate")
-    monkeypatch.setattr(main_mod.ai_config, "openai_api_key", "test-key")
+    # Reload gives `main` a fresh `ai_config` instance, but router/deps modules keep the
+    # pre-reload singleton. Patch every distinct object so ensure_db_ready and /health
+    # see DATABASE_URL + OPENAI_API_KEY (otherwise 503 and ai_ready=false).
+    from app import deps
+    from app.routers import health
+
+    _db_url = "postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate"
+    _api_key = "test-key"
+    for _cfg in {id(c): c for c in (deps.ai_config, health.ai_config, main_mod.ai_config)}.values():
+        monkeypatch.setattr(_cfg, "database_url", _db_url)
+        monkeypatch.setattr(_cfg, "openai_api_key", _api_key)
     monkeypatch.setattr("app.paths.LOCAL_POLICY_STORAGE_ROOT", tmp_path)
     monkeypatch.setattr("app.case_service.ensure_case", AsyncMock(return_value=None))
     monkeypatch.setattr(main_mod, "create_ai_engine", lambda: _DummyEngine())
@@ -407,20 +416,8 @@ def test_seed_accident_demo_endpoint_returns_seeded_payload(monkeypatch, tmp_pat
 
     monkeypatch.setattr(cases_and_accident, "seed_demo_accident_case", fake_seed_demo_accident_case)
 
-    now = datetime.now(UTC)
-    fake_seed_case = CaseRow(
-        id="demo-accident-2026-04",
-        claim_notice_at=None,
-        proof_of_claim_at=None,
-        last_deadline_alert_at=None,
-        stage_a_json={},
-        stage_b_json=None,
-        report_payload_json=None,
-        chat_context_json=None,
-        created_at=now,
-        updated_at=now,
-    )
-    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_seed_case))
+    # Seed-accident must not require a pre-existing row; ensure_case happens inside the service.
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=None))
 
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.post("/cases/demo-accident-2026-04/demo/seed-accident")

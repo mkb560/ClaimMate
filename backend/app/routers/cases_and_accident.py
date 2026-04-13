@@ -95,9 +95,6 @@ async def seed_accident_demo_case(
 ) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
-    row = await case_service.get_case_row(normalized)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Case not found.")
     await assert_can_access_case(normalized, ctx)
     return await seed_demo_accident_case(normalized)
 

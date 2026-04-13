@@ -56,8 +56,8 @@ async def upload_policy(
 ) -> dict[str, object]:
     normalized_case_id = validate_case_id(case_id)
     ensure_ai_ready(request)
-    await case_service.ensure_case(normalized_case_id)
     await assert_can_access_case(normalized_case_id, ctx)
+    await case_service.ensure_case(normalized_case_id)
     saved_path = await save_uploaded_policy(normalized_case_id, file, LOCAL_POLICY_STORAGE_ROOT)
     chunk_count = await ingest_local_policy_file(saved_path, case_id=normalized_case_id)
     return {
@@ -77,8 +77,8 @@ async def seed_demo_policy_for_case(
 ) -> dict[str, object]:
     normalized_case_id = validate_case_id(case_id)
     ensure_ai_ready(request)
-    await case_service.ensure_case(normalized_case_id)
     await assert_can_access_case(normalized_case_id, ctx)
+    await case_service.ensure_case(normalized_case_id)
     seed_request = body or SeedPolicyBody()
     try:
         return await seed_demo_policy(normalized_case_id, seed_request.policy_key)
@@ -108,8 +108,8 @@ async def ask_case_question(
 ) -> dict[str, object]:
     normalized_case_id = validate_case_id(case_id)
     ensure_ai_ready(request)
-    await case_service.ensure_case(normalized_case_id)
     await assert_can_access_case(normalized_case_id, ctx)
+    await case_service.ensure_case(normalized_case_id)
 
     question = payload.question.strip()
     if not question:
