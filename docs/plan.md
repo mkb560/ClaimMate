@@ -38,7 +38,7 @@ Policy Q&A
 | --- | --- | --- | --- |
 | Policy Q&A / RAG | 帮用户理解 policy 和 California claim rules | 已实现 KB-A/KB-B 双源 RAG、policy upload、demo policy seed、policy status、citations、demo eval | 扩充 deterministic policy fact extraction、citation guard、更多 demo/eval questions |
 | Accident Collection / Report | 帮用户结构化保存事故材料，减少遗漏 | 已实现 Stage A/B backend contract、accident API、report payload builder、fixed demo accident seed | Lou 继续完善 frontend form / report UX；后续接 PDF report file generation |
-| AI-assisted Group Chat | 帮用户在 claim follow-up 中获得 AI 辅助和上下文衔接 | 已实现 `handle_chat_event`、stage-aware AI behavior、dispute/deadline triggers、chat message persistence、`room_bootstrap` | Ke 后续接 WebSocket room / invite link；Mingtao 继续增强 chat AI behavior |
+| AI-assisted Group Chat | 帮用户在 claim follow-up 中获得 AI 辅助和上下文衔接 | 已实现 `handle_chat_event`、stage-aware AI behavior、dispute/deadline triggers、chat message persistence、`room_bootstrap`；**已加 WebSocket 房间与 invite 产品层（`AUTH_MODE` + JWT）** | Mingtao 继续增强 chat AI behavior；Ke 侧可继续接水平扩展 / 前端 WS 联调 |
 
 ## 5. 当前已实现状态
 
@@ -82,12 +82,10 @@ Policy Q&A
 
 以下内容不要描述成已完成，除非后续代码确实落地：
 
-- Full authentication flows
+- **（已落地，仍属课程/原型）** JWT 注册/登录、`AUTH_MODE`、case membership、invite 发放/兑换、`WS /ws/cases/{case_id}` 内存房间 — 详见 `docs/AUTH_AND_WEBSOCKET_KE.md`
 - Stripe checkout / webhook / paid unlock
 - Production deployment config and ops
 - Database migrations for production schema management
-- WebSocket room management
-- Invite-link issuance / validation
 - Final PDF report file generation and export pipeline
 - Full case CRUD beyond current demo/product hooks
 - Production-grade privacy, consent, observability, and abuse controls
@@ -125,7 +123,7 @@ Policy Q&A
 
 - Keep `main` stable and push owner work through `mingtao/dev`, `ke/...`, and `lou/...` style branches.
 - Mingtao: Dispute Next-Step Helper、Deadline Explainer、expanded policy fact extraction 和 citation guard lite 已落地；下一步继续做真实 demo transcript 调优和 chat AI regression coverage。
-- Ke: continue from HTTP chat persistence toward WebSocket room/invite-link architecture and production DB migration path.
+- Ke: WebSocket room + invite + JWT/`AUTH_MODE` prototype landed; continue toward production DB migrations and scaled realtime if needed.
 - Lou: finish accident form polish, report preview/PDF UX, citation/chat timeline display, and final demo UI polish.
 
 ### Technical Milestone 1 Scope

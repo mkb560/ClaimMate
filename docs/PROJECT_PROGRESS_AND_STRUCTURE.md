@@ -12,7 +12,7 @@
 |------|------|------------------|
 | **1** | 双知识源 RAG（保单 KB-A + 法规 KB-B） | **最完整**：ingest、检索、grounded 回答、citations、争议/阶段化 chat 逻辑等在 `backend/ai/` 已落地 |
 | **2** | 两阶段事故收集与报告 | **契约 + 后端 API + 存储**已接好；**前端 demo 已能读 snapshot / report**；**完整表单、PDF 成品文件**仍待做 |
-| **3** | 理赔群聊中的 AI 支持 | **`handle_chat_event` 等模块已有**；**HTTP 入口已接**；**前端 demo 已能展示 chat response**；**完整 WebSocket 房间 / invite 产品层**仍待做 |
+| **3** | 理赔群聊中的 AI 支持 | **`handle_chat_event`、HTTP 与可选 WebSocket**；**JWT 注册登录、`AUTH_MODE`、case membership、invite 发放/兑换**；**`WS /ws/cases/{case_id}` 内存房间（原型）** — 详见 [`AUTH_AND_WEBSOCKET_KE.md`](AUTH_AND_WEBSOCKET_KE.md) |
 
 项目定位仍是 **课程/原型**：AI core 与产品层后端已大幅打通，但**非**生产级平台（无完整 auth、计费、迁移体系等）。
 
@@ -61,9 +61,12 @@
   - `GET /cases/{case_id}/accident/report`  
 - **索赔日期与聊天入口**  
   - `PATCH /cases/{case_id}/claim-dates`  
-  - `POST /cases/{case_id}/chat/event` → `handle_chat_event`（落库用户/AI 消息行）  
+  - `POST /cases/{case_id}/chat/event` → `chat_dispatch.chat_event_dispatch`（落库用户/AI 消息行）  
   - `GET /cases/{case_id}/chat/messages`、`POST /cases/{case_id}/chat/messages`（简化 `@AI` 发帖）  
-  - `DELETE /cases/{case_id}` — 删除 case、聊天记录、该 case 的 KB-A 向量（最小 lifecycle / demo 重置）  
+  - `DELETE /cases/{case_id}` — 删除 case、聊天记录、membership/invite、该 case 的 KB-A 向量（最小 lifecycle / demo 重置）  
+  - **Auth（可选）** — `POST /auth/register`、`POST /auth/login`、`GET /auth/me`；`AUTH_MODE` 控制 `/cases/*` 与 policy 路由是否要求 JWT + membership（默认 `off` 保持 demo/smoke）  
+  - **Invite** — `POST /cases/{case_id}/invites`（owner）、`GET /invites/lookup`、`POST /auth/accept-invite`  
+  - **WebSocket** — `WS /ws/cases/{case_id}?token=...` 房间内广播与可选 AI 派发（见 [`AUTH_AND_WEBSOCKET_KE.md`](AUTH_AND_WEBSOCKET_KE.md)）  
 
 `GET /cases/{case_id}` 的 snapshot 含 **`room_bootstrap`**（来自事故报告写入的 `chat_context`），便于聊天区展示与 pinned 上下文。
 
@@ -95,7 +98,7 @@
 |------|------|
 | **事故前端** | Stage A / B 表单、照片与报告预览等需与 API 字段对齐（见 accident 契约与 Lou 文档） |
 | **PDF 事故报告文件** | 后端产出标准化 JSON；**生成可下载 PDF 文件**仍待接入 |
-| **群聊产品层** | WebSocket 房间、invite 免注册加入、与 pinned 报告/上下文的完整串联 |
+| **群聊产品层** | 后端已提供 **JWT + membership + invite + WS 房间（原型）**；前端免注册加入、与 pinned 报告完整串联仍依赖 Lou 侧产品化 |
 | **支付 / Stripe** | 未在原型范围优先实现 |
 | **完整部署与运维** | 无统一生产部署与监控方案 |
 | **正式 case CRUD / DB 迁移** | 当前为开发友好型 `create_all` + 字符串 `case_id`；长期可演进 UUID、Alembic 等 |

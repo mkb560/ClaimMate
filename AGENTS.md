@@ -248,11 +248,11 @@ The AI deadline module assumes the application layer provides these columns on `
 
 Do **not** assume the following already exist in this repo:
 
-- full authentication flows
+- production-hardened authentication (OAuth providers, refresh tokens, email verification, rate limits)
 - full case CRUD beyond the current create + accident/report + claim-date hooks
-- WebSocket room management
+- horizontally scaled WebSocket rooms (in-memory rooms exist; Redis/pub-sub does not)
 - Stripe checkout or webhook handling
-- invite-link issuance/validation
+- production invite UX (deep links, short codes) beyond HTTP lookup + accept
 - PDF report generation pipeline
 - shared SQLAlchemy ORM for application tables
 - database migrations

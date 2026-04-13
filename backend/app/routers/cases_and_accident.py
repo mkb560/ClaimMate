@@ -3,56 +3,20 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from ai.chat.chat_ai_service import handle_chat_event
+from app.auth_deps import AuthContext, get_auth_context
+from app.auth_service import add_case_owner_if_absent
+from app.case_access import assert_can_access_case, assert_can_create_case
 from app.case_validation import validate_case_id
-from app.chat_serialize import ai_response_to_dict
+from app.chat_dispatch import chat_event_dispatch
 from app.demo_case_service import seed_demo_accident_case
 from app.deps import ensure_ai_ready, ensure_db_ready
 from app import case_service
-from models.ai_types import ChatEvent, ChatEventTrigger, Participant
+from models.ai_types import ChatEventTrigger, Participant
 
 router = APIRouter(tags=["cases"])
-
-
-async def _chat_event_dispatch(
-    case_id: str,
-    *,
-    sender_role: str,
-    message_text: str,
-    participants: list[Participant],
-    invite_sent: bool,
-    trigger: ChatEventTrigger,
-    metadata: dict[str, Any],
-    occurred_at: datetime | None = None,
-) -> dict[str, Any] | None:
-    event = ChatEvent(
-        case_id=case_id,
-        sender_role=sender_role,
-        message_text=message_text,
-        participants=participants,
-        invite_sent=invite_sent,
-        trigger=trigger,
-        metadata=dict(metadata),
-        occurred_at=occurred_at,
-    )
-    if trigger == ChatEventTrigger.MESSAGE and message_text.strip():
-        merged_meta = dict(metadata)
-        merged_meta.setdefault("chat_event_trigger", trigger.value)
-        await case_service.append_chat_user_message(
-            case_id,
-            sender_role,
-            message_text.strip(),
-            metadata=merged_meta,
-        )
-    response = await handle_chat_event(event)
-    if response is None:
-        return None
-    payload = ai_response_to_dict(response)
-    await case_service.append_chat_ai_message(case_id, payload)
-    return payload
 
 
 class CreateCaseBody(BaseModel):
@@ -89,8 +53,13 @@ class ChatMessageSimpleBody(BaseModel):
 
 
 @router.post("/cases", status_code=201)
-async def create_case(request: Request, body: CreateCaseBody = CreateCaseBody()) -> dict[str, str]:
+async def create_case(
+    request: Request,
+    body: CreateCaseBody = CreateCaseBody(),
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, str]:
     ensure_db_ready(request)
+    await assert_can_create_case(ctx)
     requested_id = None
     if body.case_id is not None and body.case_id.strip():
         requested_id = validate_case_id(body.case_id.strip())
@@ -98,23 +67,35 @@ async def create_case(request: Request, body: CreateCaseBody = CreateCaseBody())
         case_id = await case_service.create_case(case_id=requested_id)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if ctx.user is not None:
+        await add_case_owner_if_absent(case_id, ctx.user.id)
     return {"case_id": case_id}
 
 
 @router.get("/cases/{case_id}")
-async def get_case_snapshot(case_id: str, request: Request) -> dict[str, object]:
+async def get_case_snapshot(
+    case_id: str,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
     row = await case_service.get_case_row(normalized)
     if row is None:
         raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     return case_service.serialize_case_snapshot(row)
 
 
 @router.post("/cases/{case_id}/demo/seed-accident")
-async def seed_accident_demo_case(case_id: str, request: Request) -> dict[str, object]:
+async def seed_accident_demo_case(
+    case_id: str,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
+    await assert_can_access_case(normalized, ctx)
     return await seed_demo_accident_case(normalized)
 
 
@@ -123,9 +104,14 @@ async def accident_stage_a(
     case_id: str,
     request: Request,
     patch: dict[str, Any] = Body(default_factory=dict),
+    ctx: AuthContext = Depends(get_auth_context),
 ) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     try:
         merged = await case_service.patch_stage_a(normalized, patch)
     except KeyError as exc:
@@ -138,9 +124,14 @@ async def accident_stage_b(
     case_id: str,
     request: Request,
     patch: dict[str, Any] = Body(default_factory=dict),
+    ctx: AuthContext = Depends(get_auth_context),
 ) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     try:
         merged = await case_service.patch_stage_b(normalized, patch)
     except KeyError as exc:
@@ -149,9 +140,17 @@ async def accident_stage_b(
 
 
 @router.post("/cases/{case_id}/accident/report")
-async def generate_accident_report(case_id: str, request: Request) -> dict[str, object]:
+async def generate_accident_report(
+    case_id: str,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     try:
         payload, chat_context = await case_service.generate_and_store_report(normalized)
     except KeyError as exc:
@@ -164,23 +163,37 @@ async def generate_accident_report(case_id: str, request: Request) -> dict[str, 
 
 
 @router.get("/cases/{case_id}/accident/report")
-async def get_accident_report(case_id: str, request: Request) -> dict[str, object]:
+async def get_accident_report(
+    case_id: str,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     stored = await case_service.get_stored_report(normalized)
     if stored is None:
-        row = await case_service.get_case_row(normalized)
-        if row is None:
-            raise HTTPException(status_code=404, detail="Case not found.")
         raise HTTPException(status_code=404, detail="Accident report has not been generated yet.")
     chat = await case_service.get_stored_chat_context(normalized)
     return {"case_id": normalized, "report_payload": stored, "chat_context": chat}
 
 
 @router.patch("/cases/{case_id}/claim-dates")
-async def patch_claim_dates(case_id: str, request: Request, body: ClaimDatesBody) -> dict[str, object]:
+async def patch_claim_dates(
+    case_id: str,
+    request: Request,
+    body: ClaimDatesBody,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     try:
         await case_service.update_claim_dates(
             normalized,
@@ -202,26 +215,34 @@ async def list_case_chat_messages(
     request: Request,
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    ctx: AuthContext = Depends(get_auth_context),
 ) -> dict[str, object]:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
     row = await case_service.get_case_row(normalized)
     if row is None:
         raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     messages = await case_service.list_chat_messages(normalized, limit=limit, offset=offset)
     return {"case_id": normalized, "messages": messages, "limit": limit, "offset": offset}
 
 
 @router.post("/cases/{case_id}/chat/messages")
-async def post_case_chat_message(case_id: str, request: Request, body: ChatMessageSimpleBody) -> dict[str, object]:
+async def post_case_chat_message(
+    case_id: str,
+    request: Request,
+    body: ChatMessageSimpleBody,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     ensure_ai_ready(request)
     normalized = validate_case_id(case_id)
     row = await case_service.get_case_row(normalized)
     if row is None:
         raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     parts = body.participants or [ParticipantIn(user_id="owner-1", role="owner")]
     participants = [Participant(user_id=p.user_id, role=p.role) for p in parts]
-    result = await _chat_event_dispatch(
+    result = await chat_event_dispatch(
         normalized,
         sender_role=body.sender_role,
         message_text=body.message_text.strip(),
@@ -235,14 +256,20 @@ async def post_case_chat_message(case_id: str, request: Request, body: ChatMessa
 
 
 @router.post("/cases/{case_id}/chat/event")
-async def chat_event(case_id: str, request: Request, body: ChatEventBody) -> dict[str, object]:
+async def chat_event(
+    case_id: str,
+    request: Request,
+    body: ChatEventBody,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
     ensure_ai_ready(request)
     normalized = validate_case_id(case_id)
     row = await case_service.get_case_row(normalized)
     if row is None:
         raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
 
-    result = await _chat_event_dispatch(
+    result = await chat_event_dispatch(
         normalized,
         sender_role=body.sender_role,
         message_text=body.message_text,
@@ -256,9 +283,17 @@ async def chat_event(case_id: str, request: Request, body: ChatEventBody) -> dic
 
 
 @router.delete("/cases/{case_id}", status_code=204)
-async def delete_case_endpoint(case_id: str, request: Request) -> Response:
+async def delete_case_endpoint(
+    case_id: str,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> Response:
     ensure_db_ready(request)
     normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
     deleted = await case_service.delete_case_and_related_data(normalized)
     if not deleted:
         raise HTTPException(status_code=404, detail="Case not found.")

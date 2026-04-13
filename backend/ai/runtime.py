@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from ai.config import ai_config
 from ai.ingestion.vector_store import ensure_vector_schema, init_engine
+from models import auth_orm  # noqa: F401  # registers auth tables on CaseBase.metadata
 from models.case_orm import CaseBase
 
 

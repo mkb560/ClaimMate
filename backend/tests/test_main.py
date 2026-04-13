@@ -41,8 +41,17 @@ def _build_client(monkeypatch, tmp_path: Path) -> TestClient:
     async def fake_bootstrap(engine) -> None:
         return None
 
-    monkeypatch.setattr(main_mod.ai_config, "database_url", "postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate")
-    monkeypatch.setattr(main_mod.ai_config, "openai_api_key", "test-key")
+    # Reload gives `main` a fresh `ai_config` instance, but router/deps modules keep the
+    # pre-reload singleton. Patch every distinct object so ensure_db_ready and /health
+    # see DATABASE_URL + OPENAI_API_KEY (otherwise 503 and ai_ready=false).
+    from app import deps
+    from app.routers import health
+
+    _db_url = "postgresql+psycopg://claimmate:claimmate@localhost:5433/claimmate"
+    _api_key = "test-key"
+    for _cfg in {id(c): c for c in (deps.ai_config, health.ai_config, main_mod.ai_config)}.values():
+        monkeypatch.setattr(_cfg, "database_url", _db_url)
+        monkeypatch.setattr(_cfg, "openai_api_key", _api_key)
     monkeypatch.setattr("app.paths.LOCAL_POLICY_STORAGE_ROOT", tmp_path)
     monkeypatch.setattr("app.case_service.ensure_case", AsyncMock(return_value=None))
     monkeypatch.setattr(main_mod, "create_ai_engine", lambda: _DummyEngine())
@@ -139,6 +148,21 @@ def test_get_policy_status_endpoint_returns_indexed_policy_summary(monkeypatch, 
         }
 
     monkeypatch.setattr(policy_ask, "get_policy_status", fake_get_policy_status)
+
+    now = datetime.now(UTC)
+    fake_policy_case = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(policy_ask.case_service, "get_case_row", AsyncMock(return_value=fake_policy_case))
 
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.get("/cases/demo-case/policy")
@@ -247,6 +271,21 @@ def test_ask_endpoint_returns_answer_and_citations(monkeypatch, tmp_path: Path) 
         )
 
     monkeypatch.setattr(policy_ask, "answer_policy_question", fake_answer_policy_question)
+
+    now = datetime.now(UTC)
+    fake_ask_case = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(policy_ask.case_service, "get_case_row", AsyncMock(return_value=fake_ask_case))
 
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.post(
@@ -377,6 +416,9 @@ def test_seed_accident_demo_endpoint_returns_seeded_payload(monkeypatch, tmp_pat
 
     monkeypatch.setattr(cases_and_accident, "seed_demo_accident_case", fake_seed_demo_accident_case)
 
+    # Seed-accident must not require a pre-existing row; ensure_case happens inside the service.
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=None))
+
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.post("/cases/demo-accident-2026-04/demo/seed-accident")
 
@@ -411,7 +453,9 @@ def test_chat_event_persists_user_and_ai_when_model_responds(monkeypatch, tmp_pa
         assert event.case_id == "demo-case"
         return AIResponse(text="Answer", citations=[], trigger=AITrigger.MENTION, metadata={})
 
-    monkeypatch.setattr(cases_and_accident, "handle_chat_event", fake_handle)
+    from app import chat_dispatch
+
+    monkeypatch.setattr(chat_dispatch, "handle_chat_event", fake_handle)
 
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.post(
@@ -453,7 +497,9 @@ def test_chat_event_skips_ai_append_when_no_response(monkeypatch, tmp_path: Path
     append_ai = AsyncMock()
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_user_message", append_user)
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_ai_message", append_ai)
-    monkeypatch.setattr(cases_and_accident, "handle_chat_event", AsyncMock(return_value=None))
+    from app import chat_dispatch
+
+    monkeypatch.setattr(chat_dispatch, "handle_chat_event", AsyncMock(return_value=None))
 
     with _build_client(monkeypatch, tmp_path) as client:
         response = client.post(
@@ -525,8 +571,10 @@ def test_post_chat_messages_triggers_dispatch(monkeypatch, tmp_path: Path) -> No
     monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_user_message", AsyncMock())
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_ai_message", AsyncMock())
+    from app import chat_dispatch
+
     monkeypatch.setattr(
-        cases_and_accident,
+        chat_dispatch,
         "handle_chat_event",
         AsyncMock(return_value=AIResponse(text="Simple", citations=[], trigger=AITrigger.MENTION, metadata={})),
     )
@@ -544,6 +592,20 @@ def test_post_chat_messages_triggers_dispatch(monkeypatch, tmp_path: Path) -> No
 def test_delete_case_returns_204(monkeypatch, tmp_path: Path) -> None:
     from app.routers import cases_and_accident
 
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
     monkeypatch.setattr(cases_and_accident.case_service, "delete_case_and_related_data", AsyncMock(return_value=True))
 
     with _build_client(monkeypatch, tmp_path) as client:
@@ -555,6 +617,7 @@ def test_delete_case_returns_204(monkeypatch, tmp_path: Path) -> None:
 def test_delete_case_missing_returns_404(monkeypatch, tmp_path: Path) -> None:
     from app.routers import cases_and_accident
 
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=None))
     monkeypatch.setattr(cases_and_accident.case_service, "delete_case_and_related_data", AsyncMock(return_value=False))
 
     with _build_client(monkeypatch, tmp_path) as client:

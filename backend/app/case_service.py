@@ -255,6 +255,9 @@ async def list_chat_messages(case_id: str, *, limit: int = 100, offset: int = 0)
 
 
 async def delete_case_and_related_data(case_id: str) -> bool:
+    from app.auth_service import delete_memberships_and_invites_for_case
+
+    await delete_memberships_and_invites_for_case(case_id)
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
         await session.execute(delete(CaseChatMessageRow).where(CaseChatMessageRow.case_id == case_id))
