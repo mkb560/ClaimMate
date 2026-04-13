@@ -8,8 +8,8 @@ from ai.deadline.deadline_checker import (
     is_deadline_question,
     maybe_get_deadline_alert,
 )
-from ai.dispute.keyword_filter import detect_dispute_signal
-from ai.dispute.semantic_detector import classify_dispute
+from ai.dispute.keyword_filter import DisputeSignal, detect_dispute_signal
+from ai.dispute.semantic_detector import STATUTE_BY_DISPUTE_TYPE, classify_dispute
 from ai.rag.prompt_templates import DISCLAIMER_FOOTER
 from ai.rag.query_engine import answer_dispute_question, answer_policy_question, summarize_policy_highlights
 from models.ai_types import AIResponse, AITrigger, AnswerResponse, ChatEvent, ChatEventTrigger, ChatStage
@@ -65,6 +65,17 @@ def _append_dispute_next_steps(answer: AnswerResponse, *, dispute_type: str) -> 
     )
 
 
+def _dispute_type_from_signal(signal: DisputeSignal) -> str:
+    matched = {item.lower() for item in signal.matched}
+    if matched & {"denied my claim", "claim denied", "refuse to pay", "rejection letter"}:
+        return "DENIAL"
+    if matched & {"underpaid", "wrong amount", "too low"}:
+        return "AMOUNT"
+    if matched & {"delay", "no response", "ignored"}:
+        return "DELAY"
+    return "OTHER"
+
+
 def _to_ai_response(answer, *, trigger: AITrigger, stage: ChatStage, metadata: dict | None = None) -> AIResponse:
     text = answer.answer
     if stage == ChatStage.STAGE_3 and not text.startswith("For reference:"):
@@ -80,9 +91,34 @@ def _to_ai_response(answer, *, trigger: AITrigger, stage: ChatStage, metadata: d
     )
 
 
-async def _build_dispute_response(case_id: str, question: str, stage: ChatStage) -> AIResponse:
+async def _build_dispute_response(
+    case_id: str,
+    question: str,
+    stage: ChatStage,
+    *,
+    signal: DisputeSignal | None = None,
+) -> AIResponse:
     classification = await classify_dispute(question)
     if not classification.is_dispute:
+        if signal is not None and signal.confidence >= 0.9:
+            inferred_dispute_type = _dispute_type_from_signal(signal)
+            answer = await answer_dispute_question(
+                case_id,
+                question,
+                stage_instruction=build_stage_instruction(stage),
+            )
+            answer = _append_dispute_next_steps(answer, dispute_type=inferred_dispute_type)
+            return _to_ai_response(
+                answer,
+                trigger=AITrigger.DISPUTE,
+                stage=stage,
+                metadata={
+                    "dispute_type": inferred_dispute_type,
+                    "recommended_statute": STATUTE_BY_DISPUTE_TYPE[inferred_dispute_type],
+                    "next_step_helper": True,
+                    "dispute_signal_only": True,
+                },
+            )
         answer = await answer_policy_question(case_id, question)
         return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage)
 
@@ -127,13 +163,13 @@ async def handle_chat_event(event: ChatEvent) -> AIResponse | None:
 
             signal = detect_dispute_signal(question)
             if signal.triggered:
-                return await _build_dispute_response(event.case_id, question, stage)
+                return await _build_dispute_response(event.case_id, question, stage, signal=signal)
 
             answer = await answer_policy_question(event.case_id, question)
             return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage)
 
         signal = detect_dispute_signal(event.message_text)
         if signal.triggered:
-            return await _build_dispute_response(event.case_id, event.message_text, stage)
+            return await _build_dispute_response(event.case_id, event.message_text, stage, signal=signal)
 
     return await maybe_get_deadline_alert(event.case_id, stage=stage)
