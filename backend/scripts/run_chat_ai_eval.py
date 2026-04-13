@@ -148,6 +148,13 @@ async def _fake_explain_deadlines_for_case(case_id: str, *, stage: ChatStage) ->
 
 async def _fake_classify_dispute(message_text: str) -> DisputeClassification:
     lowered = message_text.lower()
+    if "rejection letter" in lowered:
+        return DisputeClassification(
+            is_dispute=False,
+            dispute_type="NOT_DISPUTE",
+            recommended_statute=None,
+            rationale="Demo classifier fallback.",
+        )
     if "denied" in lowered or "claim denied" in lowered:
         return DisputeClassification(
             is_dispute=True,
@@ -248,6 +255,28 @@ def _build_eval_cases() -> list[ChatEvalCase]:
                 "dispute_type": "DENIAL",
                 "recommended_statute": "10 CCR 2695.7(b)",
                 "next_step_helper": True,
+            },
+            require_citations=True,
+        ),
+        ChatEvalCase(
+            name="stage_3_keyword_only_dispute_fallback",
+            event=ChatEvent(
+                case_id="case-1",
+                sender_role="owner",
+                message_text="I received a rejection letter and need help understanding what happened.",
+                participants=_stage_3_participants(),
+                invite_sent=True,
+                trigger=ChatEventTrigger.MESSAGE,
+            ),
+            expected_trigger=AITrigger.DISPUTE,
+            expected_stage=ChatStage.STAGE_3,
+            expected_text_prefix="For reference:",
+            expected_text_contains=("Next steps to consider", "What to collect", "written reason"),
+            expected_metadata={
+                "dispute_type": "DENIAL",
+                "recommended_statute": "10 CCR §2695.7(b)",
+                "next_step_helper": True,
+                "dispute_signal_only": True,
             },
             require_citations=True,
         ),

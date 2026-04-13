@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock
+
 from ai.dispute.semantic_detector import DisputeClassification
 from ai.rag.prompt_templates import DISCLAIMER_FOOTER
 from models.ai_types import AIResponse, AITrigger, AnswerResponse, ChatEvent, ChatEventTrigger, ChatStage, Participant
@@ -180,6 +182,67 @@ async def test_handle_chat_event_non_mention_dispute_takes_precedence_over_deadl
     assert "What to collect:" in response.text
     assert "denial letter" in response.text
     assert deadline_called is False
+
+
+async def test_handle_chat_event_hard_dispute_signal_stays_on_dispute_path_when_classifier_is_inconclusive(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    policy_called = False
+
+    async def fake_classify_dispute(message_text: str):
+        return DisputeClassification(
+            is_dispute=False,
+            dispute_type="NOT_DISPUTE",
+            recommended_statute=None,
+            rationale="Classifier inconclusive.",
+        )
+
+    async def fake_answer_policy_question(case_id: str, question: str):
+        nonlocal policy_called
+        policy_called = True
+        return AnswerResponse(
+            answer=f"Generic policy answer.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    async def fake_answer_dispute_question(case_id: str, question: str, *, stage_instruction: str):
+        return AnswerResponse(
+            answer=(
+                "I don't have enough information in the uploaded policy and regulatory materials to answer that confidently."
+                f"\n\n{DISCLAIMER_FOOTER}"
+            ),
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    monkeypatch.setattr(chat_ai_service, "classify_dispute", fake_classify_dispute)
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "answer_dispute_question", fake_answer_dispute_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="The insurer denied my claim and I need help understanding the denial.",
+        participants=[
+            Participant(user_id="1", role="owner"),
+            Participant(user_id="2", role="adjuster"),
+        ],
+        invite_sent=True,
+        trigger=ChatEventTrigger.MESSAGE,
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.DISPUTE
+    assert response.text.startswith("For reference:")
+    assert "don't have enough information" in response.text
+    assert "Next steps to consider:" in response.text
+    assert response.metadata["dispute_type"] == "DENIAL"
+    assert response.metadata["recommended_statute"] == "10 CCR §2695.7(b)"
+    assert response.metadata["dispute_signal_only"] is True
+    assert policy_called is False
 
 
 async def test_handle_chat_event_explicit_deadline_mention_uses_deadline_explainer(monkeypatch) -> None:
