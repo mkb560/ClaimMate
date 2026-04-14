@@ -43,7 +43,9 @@
 ## Milestone 录制材料
 
 - `TECHNICAL_MILESTONE_1_VIDEO_SCRIPT.md`：Technical Milestone 1 录屏操作与英文讲稿。
+- `TECHNICAL_MILESTONE_2_VIDEO_SCRIPT.md`：Technical Milestone 2 录屏操作与英文讲稿。
 - `BUSINESS_MILESTONE_1_VIDEO_SCRIPT.md`：Business Milestone 1 动画视频英文讲稿与 PPT 展示建议。
+- `BUSINESS_MILESTONE_2_VIDEO_SCRIPT.md`：Business Milestone 2 面向投资人的市场 / 商业研究视频讲稿与 PPT 建议。
 
 ## 已收口的旧文档
 
