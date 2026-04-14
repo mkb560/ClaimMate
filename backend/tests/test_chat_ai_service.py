@@ -178,8 +178,8 @@ async def test_handle_chat_event_non_mention_dispute_takes_precedence_over_deadl
     assert response.metadata["dispute_type"] == "DENIAL"
     assert response.metadata["recommended_statute"] == "10 CCR 2695.7(b)"
     assert response.metadata["next_step_helper"] is True
-    assert "Next steps to consider:" in response.text
-    assert "What to collect:" in response.text
+    assert "A few practical next steps to keep the discussion organized:" in response.text
+    assert "Documents to gather:" in response.text
     assert "denial letter" in response.text
     assert deadline_called is False
 
@@ -238,11 +238,104 @@ async def test_handle_chat_event_hard_dispute_signal_stays_on_dispute_path_when_
     assert response.trigger == AITrigger.DISPUTE
     assert response.text.startswith("For reference:")
     assert "don't have enough information" in response.text
-    assert "Next steps to consider:" in response.text
+    assert "A few practical next steps to keep the discussion organized:" in response.text
     assert response.metadata["dispute_type"] == "DENIAL"
     assert response.metadata["recommended_statute"] == "10 CCR §2695.7(b)"
     assert response.metadata["dispute_signal_only"] is True
     assert policy_called is False
+
+
+async def test_handle_chat_event_stage_2_delay_dispute_uses_stage_2_checklist_wording(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    async def fake_classify_dispute(message_text: str):
+        return DisputeClassification(
+            is_dispute=True,
+            dispute_type="DELAY",
+            recommended_statute="10 CCR §2695.5(e) / §2695.7(c)",
+            rationale="Demo delay signal.",
+        )
+
+    async def fake_answer_dispute_question(case_id: str, question: str, *, stage_instruction: str):
+        assert "preparing to involve an adjuster" in stage_instruction
+        return AnswerResponse(
+            answer=(
+                f"The delay may implicate California claim-handling timelines, so the owner should organize the claim timeline "
+                f"and supporting documents before the next adjuster conversation. [S1]\n\n{DISCLAIMER_FOOTER}"
+            ),
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    monkeypatch.setattr(chat_ai_service, "classify_dispute", fake_classify_dispute)
+    monkeypatch.setattr(chat_ai_service, "answer_dispute_question", fake_answer_dispute_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="The insurer still has no response and the claim is delayed.",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=True,
+        trigger=ChatEventTrigger.MESSAGE,
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.DISPUTE
+    assert response.metadata["stage"] == ChatStage.STAGE_2.value
+    assert response.metadata["dispute_type"] == "DELAY"
+    assert "Before you involve the adjuster, here is a practical checklist:" in response.text
+    assert "Documents to gather:" in response.text
+    assert "claim timeline" in response.text
+    assert not response.text.startswith("For reference:")
+
+
+async def test_handle_chat_event_stage_3_amount_dispute_uses_amount_specific_wording(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    async def fake_classify_dispute(message_text: str):
+        return DisputeClassification(
+            is_dispute=True,
+            dispute_type="AMOUNT",
+            recommended_statute="10 CCR §2695.8",
+            rationale="Demo amount signal.",
+        )
+
+    async def fake_answer_dispute_question(case_id: str, question: str, *, stage_instruction: str):
+        return AnswerResponse(
+            answer=(
+                f"The amount dispute may require comparing repair estimates and asking the insurer for a written explanation "
+                f"of how the payment was calculated. [S1]\n\n{DISCLAIMER_FOOTER}"
+            ),
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    monkeypatch.setattr(chat_ai_service, "classify_dispute", fake_classify_dispute)
+    monkeypatch.setattr(chat_ai_service, "answer_dispute_question", fake_answer_dispute_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="The repair estimate is too low and I think the insurer underpaid me.",
+        participants=[
+            Participant(user_id="1", role="owner"),
+            Participant(user_id="2", role="adjuster"),
+        ],
+        invite_sent=True,
+        trigger=ChatEventTrigger.MESSAGE,
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.DISPUTE
+    assert response.text.startswith("For reference:")
+    assert response.metadata["dispute_type"] == "AMOUNT"
+    assert response.metadata["recommended_statute"] == "10 CCR §2695.8"
+    assert "repair estimates" in response.text
+    assert "payment was calculated" in response.text
 
 
 async def test_handle_chat_event_explicit_deadline_mention_uses_deadline_explainer(monkeypatch) -> None:

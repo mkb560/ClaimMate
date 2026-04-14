@@ -98,6 +98,22 @@ async def _fake_answer_dispute_question(
     *,
     stage_instruction: str,
 ) -> AnswerResponse:
+    lowered = question.lower()
+    if "too low" in lowered or "underpaid" in lowered or "wrong amount" in lowered:
+        return _answer(
+            "The amount dispute may require comparing repair estimates and asking the insurer for a written explanation of how the payment was calculated.",
+            source_type="kb_b",
+        )
+    if "delay" in lowered or "no response" in lowered or "ignored" in lowered:
+        if "preparing to involve an adjuster" in stage_instruction.lower():
+            return _answer(
+                "The delay may implicate California claim-handling timelines, so the owner should organize the claim timeline and supporting documents before the next adjuster conversation.",
+                source_type="kb_b",
+            )
+        return _answer(
+            "The delay may implicate California claim-handling timelines, so the user should document the timeline and follow up in writing.",
+            source_type="kb_b",
+        )
     return _answer(
         "The denial may implicate California fair claims handling rules, so the user should review the denial reason and saved claim documents.",
         source_type="kb_b",
@@ -125,6 +141,21 @@ async def _fake_maybe_get_deadline_alert(case_id: str, *, stage: ChatStage) -> A
 
 async def _fake_explain_deadlines_for_case(case_id: str, *, stage: ChatStage) -> AIResponse:
     opener = "For reference: " if stage == ChatStage.STAGE_3 else ""
+    if case_id == "deadline-missing-case":
+        return AIResponse(
+            text=(
+                f"{opener}Deadline overview: I do not see saved claim dates for this case yet. "
+                "Save the claim notice date and proof-of-claim date so I can calculate exact due dates."
+                f"\n\n{DISCLAIMER_FOOTER}"
+            ),
+            citations=[],
+            trigger=AITrigger.DEADLINE,
+            metadata={
+                "stage": stage.value,
+                "deadline_intent": "explainer",
+                "tracked_windows": [],
+            },
+        )
     return AIResponse(
         text=(
             f"{opener}Deadline overview based on saved case dates:\n"
@@ -161,6 +192,20 @@ async def _fake_classify_dispute(message_text: str) -> DisputeClassification:
             dispute_type="DENIAL",
             recommended_statute="10 CCR 2695.7(b)",
             rationale="Demo denial signal.",
+        )
+    if "underpaid" in lowered or "too low" in lowered or "wrong amount" in lowered:
+        return DisputeClassification(
+            is_dispute=True,
+            dispute_type="AMOUNT",
+            recommended_statute="10 CCR §2695.8",
+            rationale="Demo amount signal.",
+        )
+    if "no response" in lowered or "delay" in lowered or "ignored" in lowered:
+        return DisputeClassification(
+            is_dispute=True,
+            dispute_type="DELAY",
+            recommended_statute="10 CCR §2695.5(e) / §2695.7(c)",
+            rationale="Demo delay signal.",
         )
     return DisputeClassification(
         is_dispute=False,
@@ -250,7 +295,7 @@ def _build_eval_cases() -> list[ChatEvalCase]:
             expected_trigger=AITrigger.DISPUTE,
             expected_stage=ChatStage.STAGE_3,
             expected_text_prefix="For reference:",
-            expected_text_contains=("denial", "Next steps to consider", "What to collect"),
+            expected_text_contains=("denial", "A few practical next steps", "Documents to gather"),
             expected_metadata={
                 "dispute_type": "DENIAL",
                 "recommended_statute": "10 CCR 2695.7(b)",
@@ -271,12 +316,53 @@ def _build_eval_cases() -> list[ChatEvalCase]:
             expected_trigger=AITrigger.DISPUTE,
             expected_stage=ChatStage.STAGE_3,
             expected_text_prefix="For reference:",
-            expected_text_contains=("Next steps to consider", "What to collect", "written reason"),
+            expected_text_contains=("A few practical next steps", "Documents to gather", "written reason"),
             expected_metadata={
                 "dispute_type": "DENIAL",
                 "recommended_statute": "10 CCR §2695.7(b)",
                 "next_step_helper": True,
                 "dispute_signal_only": True,
+            },
+            require_citations=True,
+        ),
+        ChatEvalCase(
+            name="stage_2_delay_dispute_prep",
+            event=ChatEvent(
+                case_id="case-1",
+                sender_role="owner",
+                message_text="The insurer still has no response and the claim is delayed. What should I prepare before I follow up?",
+                participants=_owner_participants(),
+                invite_sent=True,
+                trigger=ChatEventTrigger.MESSAGE,
+            ),
+            expected_trigger=AITrigger.DISPUTE,
+            expected_stage=ChatStage.STAGE_2,
+            expected_text_contains=("organize the claim timeline", "Before you involve the adjuster", "Documents to gather"),
+            expected_metadata={
+                "dispute_type": "DELAY",
+                "recommended_statute": "10 CCR §2695.5(e) / §2695.7(c)",
+                "next_step_helper": True,
+            },
+            require_citations=True,
+        ),
+        ChatEvalCase(
+            name="stage_3_amount_dispute",
+            event=ChatEvent(
+                case_id="case-1",
+                sender_role="owner",
+                message_text="The repair estimate is too low and I think the insurer underpaid me.",
+                participants=_stage_3_participants(),
+                invite_sent=True,
+                trigger=ChatEventTrigger.MESSAGE,
+            ),
+            expected_trigger=AITrigger.DISPUTE,
+            expected_stage=ChatStage.STAGE_3,
+            expected_text_prefix="For reference:",
+            expected_text_contains=("amount dispute", "repair estimates", "payment was calculated"),
+            expected_metadata={
+                "dispute_type": "AMOUNT",
+                "recommended_statute": "10 CCR §2695.8",
+                "next_step_helper": True,
             },
             require_citations=True,
         ),
@@ -293,6 +379,21 @@ def _build_eval_cases() -> list[ChatEvalCase]:
             expected_trigger=AITrigger.DEADLINE,
             expected_stage=ChatStage.STAGE_1,
             expected_text_contains=("Deadline overview", "15-day acknowledgment", "40-day decision"),
+            expected_metadata={"deadline_intent": "explainer"},
+        ),
+        ChatEvalCase(
+            name="stage_2_deadline_explainer_missing_dates",
+            event=ChatEvent(
+                case_id="deadline-missing-case",
+                sender_role="owner",
+                message_text="@AI what deadlines should I know before the adjuster joins?",
+                participants=_owner_participants(),
+                invite_sent=True,
+                trigger=ChatEventTrigger.MESSAGE,
+            ),
+            expected_trigger=AITrigger.DEADLINE,
+            expected_stage=ChatStage.STAGE_2,
+            expected_text_contains=("I do not see saved claim dates", "Save the claim notice date"),
             expected_metadata={"deadline_intent": "explainer"},
         ),
         ChatEvalCase(

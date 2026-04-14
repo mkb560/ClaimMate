@@ -10,6 +10,7 @@
 - deadline question：如果 `@AI` 问题明确问 deadline / timeline / 15-day / 40-day / proof-of-claim，AI 会走 Deadline Explainer，基于 case dates 解释当前可计算的时限；如果 case 还没有保存日期，会说明需要先保存日期。
 - dispute signal：如果消息里出现 `denied my claim`、`claim denied`、`bad faith`、`underpaid`、`refuse to pay` 等 dispute 触发词，AI 会走 dispute path。
 - dispute next-step helper：dispute path 的回答会在法规/RAG 说明后附加简短行动清单，包括 what happened、what to collect、what to ask the insurer、reminder。
+- hard dispute fallback：如果命中了高置信度硬 dispute signal，但 semantic classifier 一时没有确认，AI 仍会保留 dispute path，并给出更保守的 dispute-aware fallback，而不是直接退回普通 policy QA。
 - deadline fallback：只有在普通消息没有 `@AI`、没有 dispute signal 时，AI 才会检查 deadline reminder。
 
 ## 优先级
@@ -28,7 +29,7 @@
 ## Stage 语气
 
 - `stage_1`：只有 owner，语气可以更直接、教育性更强。
-- `stage_2`：owner 已经准备邀请 adjuster 或 repair shop，但外部人员还没加入，AI 会更关注材料准备和时间线。
+- `stage_2`：owner 已经准备邀请 adjuster 或 repair shop，但外部人员还没加入，AI 会更关注材料准备、时间线和下一次沟通前该整理什么。
 - `stage_3`：adjuster 或 repair shop 已经在房间里，AI 必须保持中立。所有 stage 3 answer 都应该以 `For reference:` 开头。
 
 ## Response 字段
@@ -42,6 +43,7 @@
 - `metadata.dispute_type`：dispute path 才有，例如 `DENIAL`。
 - `metadata.recommended_statute`：dispute path 才有，用于说明建议参考的法规方向。
 - `metadata.next_step_helper`：dispute path 才有，值为 `true` 时说明正文里已经附加 next-step checklist。
+- `metadata.dispute_signal_only`：只在 hard dispute fallback 出现，表示这次保留 dispute path 主要依赖高置信度 keyword signal，而不是 classifier 的正向确认。
 - `metadata.deadline_type`：deadline reminder 才有，例如 `acknowledgment`。
 - `metadata.deadline_intent`：显式 Deadline Explainer 才有，当前值为 `explainer`。
 - `metadata.tracked_windows`：显式 Deadline Explainer 才有，列出当前 case dates 能计算出的 deadline window。
@@ -61,6 +63,9 @@ cd backend
 - stage 1 policy / regulatory mention
 - stage 3 neutral `For reference:` 前缀
 - 非 mention dispute trigger + next-step helper
+- hard dispute signal + classifier fallback 仍保留 dispute path
+- stage 2 delay / stage 3 amount dispute transcript
 - 显式 deadline explainer
+- 缺少 claim dates 时的 deadline explainer
 - deadline fallback
 - policy indexed proactive response

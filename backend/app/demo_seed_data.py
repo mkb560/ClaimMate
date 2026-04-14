@@ -187,4 +187,22 @@ def build_demo_chat_event_payloads(case_id: str = DEMO_ACCIDENT_CASE_ID) -> dict
             "trigger": ChatEventTrigger.MESSAGE.value,
             "metadata": {"demo_label": "claim_rule_stage_3"},
         },
+        "delay_stage_2": {
+            "case_id": case_id,
+            "sender_role": "owner",
+            "message_text": "The insurer still has no response and the claim is delayed. What should I prepare before I follow up?",
+            "participants": owner_only,
+            "invite_sent": True,
+            "trigger": ChatEventTrigger.MESSAGE.value,
+            "metadata": {"demo_label": "delay_stage_2"},
+        },
+        "amount_stage_3": {
+            "case_id": case_id,
+            "sender_role": "owner",
+            "message_text": "The repair estimate is too low and I think the insurer underpaid me.",
+            "participants": owner_and_adjuster,
+            "invite_sent": True,
+            "trigger": ChatEventTrigger.MESSAGE.value,
+            "metadata": {"demo_label": "amount_stage_3"},
+        },
     }

@@ -36,8 +36,17 @@ def test_build_demo_claim_dates_payload_uses_alert_friendly_relative_dates() -> 
 def test_build_demo_chat_event_payloads_cover_stage_1_and_stage_3() -> None:
     events = build_demo_chat_event_payloads()
 
-    assert set(events) == {"deadline_stage_1", "claim_rule_stage_1", "claim_rule_stage_3"}
+    assert set(events) == {
+        "deadline_stage_1",
+        "claim_rule_stage_1",
+        "claim_rule_stage_3",
+        "delay_stage_2",
+        "amount_stage_3",
+    }
     assert events["deadline_stage_1"]["case_id"] == DEMO_ACCIDENT_CASE_ID
     assert events["claim_rule_stage_1"]["participants"] == [{"user_id": "owner-1", "role": "owner"}]
+    assert events["delay_stage_2"]["invite_sent"] is True
+    assert events["delay_stage_2"]["participants"] == [{"user_id": "owner-1", "role": "owner"}]
     assert events["claim_rule_stage_3"]["invite_sent"] is True
     assert events["claim_rule_stage_3"]["participants"][1]["role"] == "adjuster"
+    assert events["amount_stage_3"]["participants"][1]["role"] == "adjuster"

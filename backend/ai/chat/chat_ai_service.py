@@ -48,13 +48,26 @@ def _strip_disclaimer(text: str) -> str:
     return text.replace(DISCLAIMER_FOOTER, "").strip()
 
 
-def _append_dispute_next_steps(answer: AnswerResponse, *, dispute_type: str) -> AnswerResponse:
+def _dispute_helper_intro(stage: ChatStage) -> str:
+    if stage == ChatStage.STAGE_1:
+        return "A practical next-step plan:"
+    if stage == ChatStage.STAGE_2:
+        return "Before you involve the adjuster, here is a practical checklist:"
+    return "A few practical next steps to keep the discussion organized:"
+
+
+def _append_dispute_next_steps(
+    answer: AnswerResponse,
+    *,
+    dispute_type: str,
+    stage: ChatStage,
+) -> AnswerResponse:
     steps = DISPUTE_NEXT_STEPS.get(dispute_type, DISPUTE_NEXT_STEPS["OTHER"])
     base_answer = _strip_disclaimer(answer.answer)
     helper = (
-        "Next steps to consider:\n"
+        f"{_dispute_helper_intro(stage)}\n"
         f"- What happened: {steps['happened']}\n"
-        f"- What to collect: {steps['collect']}\n"
+        f"- Documents to gather: {steps['collect']}\n"
         f"- What to ask the insurer: {steps['ask']}\n"
         "- Reminder: keep a written timeline and save copies of every response."
     )
@@ -107,7 +120,11 @@ async def _build_dispute_response(
                 question,
                 stage_instruction=build_stage_instruction(stage),
             )
-            answer = _append_dispute_next_steps(answer, dispute_type=inferred_dispute_type)
+            answer = _append_dispute_next_steps(
+                answer,
+                dispute_type=inferred_dispute_type,
+                stage=stage,
+            )
             return _to_ai_response(
                 answer,
                 trigger=AITrigger.DISPUTE,
@@ -127,7 +144,11 @@ async def _build_dispute_response(
         question,
         stage_instruction=build_stage_instruction(stage),
     )
-    answer = _append_dispute_next_steps(answer, dispute_type=classification.dispute_type)
+    answer = _append_dispute_next_steps(
+        answer,
+        dispute_type=classification.dispute_type,
+        stage=stage,
+    )
     return _to_ai_response(
         answer,
         trigger=AITrigger.DISPUTE,
