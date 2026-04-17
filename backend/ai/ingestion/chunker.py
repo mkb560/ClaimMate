@@ -10,6 +10,21 @@ from ai.ingestion.types import ChunkPayload, ParsedPage, SourceType
 
 STATUTE_RE = re.compile(r"(§\s*\d{4,}\.\d+[a-z]?(?:\([a-z0-9]+\))?)", re.IGNORECASE)
 HEADING_RE = re.compile(r"^[A-Z][A-Z0-9 /,&\-]{3,}$")
+PAGE_RE = re.compile(r"^PAGE\s+\d+(?:\s+OF\s+\d+)?$", re.IGNORECASE)
+GENERIC_HEADING_PREFIXES = (
+    "PAGE ",
+    "POLICY DECLARATION",
+    "POLICY DECLARATIONS",
+    "AMENDED AUTO POLICY DECLARATIONS",
+    "IMPORTANT NOTICES",
+    "YOUR POLICY DOCUMENTS",
+    "CUSTOMER SERVICE",
+)
+GENERIC_HEADING_CONTAINS = (
+    " INSURANCE COMPANY",
+    " POLICY NUMBER",
+    " EFFECTIVE DATE",
+)
 
 
 @lru_cache(maxsize=1)
@@ -30,6 +45,13 @@ def _detect_section(text: str) -> str | None:
         if statute_match:
             return statute_match.group(1).replace("  ", " ")
         if HEADING_RE.match(line):
+            upper_line = line.upper()
+            if PAGE_RE.match(upper_line):
+                continue
+            if any(upper_line.startswith(prefix) for prefix in GENERIC_HEADING_PREFIXES):
+                continue
+            if any(token in upper_line for token in GENERIC_HEADING_CONTAINS):
+                continue
             return line[:256]
     return None
 
@@ -103,4 +125,3 @@ def chunk_regulatory_pages(pages: list[ParsedPage], document_id: str) -> list[Ch
         overlap=ai_config.kb_b_chunk_overlap,
         document_id=document_id,
     )
-

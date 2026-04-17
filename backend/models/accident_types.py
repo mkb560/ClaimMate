@@ -123,7 +123,7 @@ class AccidentReportPayload:
     generated_at: datetime
     accident_summary: str
     occurrence_time: datetime | None
-    location_summary: str
+    location_summary: str | None
     owner_party: PartyRecord | None
     other_party: PartyRecord | None
     detailed_narrative: str

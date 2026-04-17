@@ -394,6 +394,30 @@ async def test_handle_chat_event_explicit_deadline_mention_uses_deadline_explain
     assert dispute_called is False
 
 
+async def test_handle_chat_event_deadline_mention_returns_friendly_message_for_missing_case(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    async def fake_explain_deadlines_for_case(case_id: str, *, stage: ChatStage):
+        raise KeyError(case_id)
+
+    monkeypatch.setattr(chat_ai_service, "explain_deadlines_for_case", fake_explain_deadlines_for_case)
+
+    event = ChatEvent(
+        case_id="missing-case",
+        sender_role="owner",
+        message_text="@AI what deadlines should I know for this claim?",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.DEADLINE
+    assert response.metadata["deadline_intent"] == "explainer_missing_case"
+    assert "could not find the saved case data" in response.text
+
+
 async def test_handle_chat_event_deadline_fallback_when_no_mention_or_dispute(monkeypatch) -> None:
     from ai.chat import chat_ai_service
 
@@ -421,3 +445,43 @@ async def test_handle_chat_event_deadline_fallback_when_no_mention_or_dispute(mo
     assert response.trigger == AITrigger.DEADLINE
     assert response.metadata["stage"] == ChatStage.STAGE_1.value
     assert response.metadata["deadline_type"] == "acknowledgment"
+
+
+async def test_handle_chat_event_soft_signal_non_mention_does_not_interject_when_classifier_is_negative(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    policy_called = False
+
+    async def fake_classify_dispute(message_text: str):
+        return DisputeClassification(
+            is_dispute=False,
+            dispute_type="NOT_DISPUTE",
+            recommended_statute=None,
+            rationale="Not a dispute after review.",
+        )
+
+    async def fake_answer_policy_question(case_id: str, question: str):
+        nonlocal policy_called
+        policy_called = True
+        return AnswerResponse(
+            answer=f"Policy answer.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    monkeypatch.setattr(chat_ai_service, "classify_dispute", fake_classify_dispute)
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="I disagree and the insurer delay is frustrating.",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is None
+    assert policy_called is False

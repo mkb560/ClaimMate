@@ -12,6 +12,7 @@ from ai.deadline.deadline_checker import (
 )
 from ai.rag.prompt_templates import DISCLAIMER_FOOTER
 from models.ai_types import ChatStage
+from unittest.mock import AsyncMock
 
 
 def _window(*, days_remaining: int, is_overdue: bool = False) -> DeadlineWindow:
@@ -101,6 +102,37 @@ def test_deadline_explainer_handles_missing_dates() -> None:
     assert message.startswith("Deadline overview: I do not see saved claim dates")
     assert "15-day acknowledgment window" in message
     assert "40-day decision window" in message
+
+
+async def test_explain_deadlines_for_case_raises_for_missing_case(monkeypatch) -> None:
+    fake_session = AsyncMock()
+
+    class _FakeMappings:
+        def first(self):
+            return None
+
+    class _FakeResult:
+        def mappings(self):
+            return _FakeMappings()
+
+    fake_result = _FakeResult()
+    fake_session.execute.return_value = fake_result
+
+    class _FakeSessionContext:
+        async def __aenter__(self):
+            return fake_session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(deadline_checker, "get_sessionmaker", lambda: lambda: _FakeSessionContext())
+
+    try:
+        await deadline_checker.explain_deadlines_for_case("missing-case", stage=ChatStage.STAGE_1)
+    except KeyError as exc:
+        assert exc.args == ("missing-case",)
+    else:
+        raise AssertionError("Expected explain_deadlines_for_case to raise KeyError for a missing case.")
 
 
 def test_deadline_cooldown_elapsed_respects_config(monkeypatch) -> None:

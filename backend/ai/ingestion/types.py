@@ -12,7 +12,7 @@ class SourceType(StrEnum):
 
 @dataclass(slots=True)
 class ParsedPage:
-    page_num: int
+    page_num: int | None
     text: str
     section: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -39,4 +39,3 @@ class EmbeddedChunk:
     case_id: str | None = None
     document_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
-

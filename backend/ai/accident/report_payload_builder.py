@@ -66,9 +66,9 @@ def _format_party_value(party: PartyRecord | None, selector: str) -> str:
     raise ValueError(f"Unsupported selector: {selector}")
 
 
-def _format_location(stage_a: StageAAccidentIntake) -> str:
+def _format_location(stage_a: StageAAccidentIntake) -> str | None:
     if stage_a.location is None:
-        return "Location not captured yet."
+        return None
 
     parts: list[str] = []
     if address := _clean_text(stage_a.location.address):
@@ -77,7 +77,7 @@ def _format_location(stage_a: StageAAccidentIntake) -> str:
     if stage_a.location.latitude is not None and stage_a.location.longitude is not None:
         parts.append(f"GPS {stage_a.location.latitude:.6f}, {stage_a.location.longitude:.6f}")
 
-    return " | ".join(parts) if parts else "Location not captured yet."
+    return " | ".join(parts) if parts else None
 
 
 def _build_summary(case_id: str, stage_a: StageAAccidentIntake, stage_b: StageBAccidentIntake | None) -> str:
@@ -87,7 +87,7 @@ def _build_summary(case_id: str, stage_a: StageAAccidentIntake, stage_b: StageBA
         sentences.append(f"Reported accident time: {stage_a.occurred_at.isoformat()}.")
 
     location_summary = _format_location(stage_a)
-    if location_summary != "Location not captured yet.":
+    if location_summary:
         sentences.append(f"Reported location: {location_summary}.")
 
     owner_name = _format_party_value(stage_a.owner_party, "name")
@@ -229,7 +229,7 @@ def build_accident_report_payload(
 def build_accident_chat_context(report_payload: AccidentReportPayload) -> AccidentChatContext:
     key_facts: list[str] = []
 
-    if report_payload.location_summary and report_payload.location_summary != "Location not captured yet.":
+    if report_payload.location_summary:
         key_facts.append(f"Location: {report_payload.location_summary}")
     if report_payload.occurrence_time is not None:
         key_facts.append(f"Accident time: {report_payload.occurrence_time.isoformat()}")

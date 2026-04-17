@@ -110,7 +110,8 @@ async def _build_dispute_response(
     stage: ChatStage,
     *,
     signal: DisputeSignal | None = None,
-) -> AIResponse:
+    allow_policy_fallback: bool = True,
+) -> AIResponse | None:
     classification = await classify_dispute(question)
     if not classification.is_dispute:
         if signal is not None and signal.confidence >= 0.9:
@@ -136,6 +137,8 @@ async def _build_dispute_response(
                     "dispute_signal_only": True,
                 },
             )
+        if not allow_policy_fallback:
+            return None
         answer = await answer_policy_question(case_id, question)
         return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage)
 
@@ -180,17 +183,43 @@ async def handle_chat_event(event: ChatEvent) -> AIResponse | None:
                 )
 
             if is_deadline_question(question):
-                return await explain_deadlines_for_case(event.case_id, stage=stage)
+                try:
+                    return await explain_deadlines_for_case(event.case_id, stage=stage)
+                except KeyError:
+                    return AIResponse(
+                        text=(
+                            "I can't explain deadlines for this case because I could not find the saved case data. "
+                            f"Reload or recreate the case, then try again.\n\n{DISCLAIMER_FOOTER}"
+                        ),
+                        citations=[],
+                        trigger=AITrigger.DEADLINE,
+                        metadata={"stage": stage.value, "deadline_intent": "explainer_missing_case"},
+                    )
 
             signal = detect_dispute_signal(question)
             if signal.triggered:
-                return await _build_dispute_response(event.case_id, question, stage, signal=signal)
+                return await _build_dispute_response(
+                    event.case_id,
+                    question,
+                    stage,
+                    signal=signal,
+                    allow_policy_fallback=True,
+                )
 
             answer = await answer_policy_question(event.case_id, question)
             return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage)
 
         signal = detect_dispute_signal(event.message_text)
         if signal.triggered:
-            return await _build_dispute_response(event.case_id, event.message_text, stage, signal=signal)
+            if response := await _build_dispute_response(
+                event.case_id,
+                event.message_text,
+                stage,
+                signal=signal,
+                allow_policy_fallback=False,
+            ):
+                return response
 
+    # Ambient deadline reminders are the final fallback when no proactive, mention,
+    # or dispute response path produced an AI reply.
     return await maybe_get_deadline_alert(event.case_id, stage=stage)

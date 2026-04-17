@@ -176,16 +176,14 @@ async def explain_deadlines_for_case(case_id: str, *, stage: ChatStage) -> AIRes
             {"case_id": case_id},
         )
         row = result.mappings().first()
+        if row is None:
+            raise KeyError(case_id)
 
     now = datetime.now(UTC)
-    windows = (
-        calculate_deadline_windows(
-            claim_notice_at=row.get("claim_notice_at"),
-            proof_of_claim_at=row.get("proof_of_claim_at"),
-            now=now,
-        )
-        if row
-        else []
+    windows = calculate_deadline_windows(
+        claim_notice_at=row.get("claim_notice_at"),
+        proof_of_claim_at=row.get("proof_of_claim_at"),
+        now=now,
     )
     return AIResponse(
         text=_format_deadline_explainer(windows, stage=stage),
@@ -242,6 +240,7 @@ async def maybe_get_deadline_alert(case_id: str, *, stage: ChatStage) -> AIRespo
                 SELECT claim_notice_at, proof_of_claim_at, last_deadline_alert_at
                 FROM cases
                 WHERE id = :case_id
+                FOR UPDATE
                 """
             ),
             {"case_id": case_id},

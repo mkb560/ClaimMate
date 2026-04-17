@@ -83,7 +83,7 @@ export type AccidentReportPayload = {
   case_id: string;
   report_title: string;
   accident_summary: string;
-  location_summary: string;
+  location_summary: string | null;
   detailed_narrative: string;
   damage_summary: string | null;
   police_report_number: string | null;

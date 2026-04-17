@@ -120,6 +120,13 @@ def _to_retrieved_chunks(records: Iterable[VectorDocument]) -> list[RetrievedChu
     ]
 
 
+def _stable_page_order():
+    return (
+        VectorDocument.page_num.asc().nulls_last(),
+        VectorDocument.id.asc(),
+    )
+
+
 async def search_case_chunks(case_id: str, query_embedding: list[float], top_k: int | None = None) -> list[RetrievedChunk]:
     sessionmaker = get_sessionmaker()
     limit = top_k or ai_config.rag_top_k_per_source
@@ -161,6 +168,7 @@ async def list_policy_chunks(case_id: str, *, limit: int | None = 3) -> list[Ret
             VectorDocument.source_type == SourceType.KB_A.value,
             VectorDocument.case_id == case_id,
         )
+        stmt = stmt.order_by(*_stable_page_order())
         if limit is not None:
             stmt = stmt.limit(limit)
         result = await session.scalars(stmt)
@@ -173,6 +181,7 @@ async def list_kb_b_chunks(*, limit: int | None = 3, document_ids: Sequence[str]
         stmt = select(VectorDocument).where(VectorDocument.source_type == SourceType.KB_B.value)
         if document_ids:
             stmt = stmt.where(VectorDocument.document_id.in_(list(document_ids)))
+        stmt = stmt.order_by(*_stable_page_order())
         if limit is not None:
             stmt = stmt.limit(limit)
         result = await session.scalars(stmt)

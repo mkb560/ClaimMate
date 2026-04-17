@@ -111,3 +111,13 @@ def test_build_accident_chat_context_exposes_follow_up_items_for_incomplete_case
     assert any("Location" not in fact for fact in chat_context.key_facts)
     assert "Stage B home follow-up details have not been completed yet." in chat_context.follow_up_items
     assert "Other party information is incomplete." in chat_context.follow_up_items
+
+
+def test_build_accident_report_payload_uses_none_for_missing_location_summary() -> None:
+    stage_a = StageAAccidentIntake(
+        owner_party=PartyRecord(role=PartyRole.OWNER, name="Mingtao Ding"),
+    )
+
+    report = build_accident_report_payload("case-3", stage_a, None, generated_at=datetime(2026, 3, 31, 1, 0, tzinfo=UTC))
+
+    assert report.location_summary is None
