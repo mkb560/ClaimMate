@@ -13,6 +13,6 @@ def extract_ai_question(message_text: str) -> str | None:
     match = MENTION_RE.search(message_text)
     if not match:
         return None
-    question = message_text[match.end() :].strip()
+    question = message_text[match.end() :].lstrip(" \t\r\n-,:;.!?")
+    question = question.strip()
     return question or None
-

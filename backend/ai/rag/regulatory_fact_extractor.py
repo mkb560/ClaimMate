@@ -27,7 +27,7 @@ def _citation_for_chunk(chunk: RetrievedChunk) -> Citation:
     return Citation(
         source_type="kb_b",
         source_label=source_label_for_chunk(chunk),
-        document_id=chunk.document_id,
+        document_id=chunk.document_id or "unknown",
         page_num=chunk.page_num,
         section=normalize_citation_section(chunk.section),
         excerpt=" ".join(chunk.chunk_text.split())[:160],

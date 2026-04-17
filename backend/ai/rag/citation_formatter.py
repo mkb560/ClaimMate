@@ -8,6 +8,7 @@ from ai.ingestion.vector_store import RetrievedChunk
 from models.ai_types import Citation
 
 SOURCE_REF_RE = re.compile(r"\[S(\d+)\]")
+EXCERPT_MAX_CHARS = 160
 
 
 def normalize_citation_section(section: str | None) -> str | None:
@@ -93,7 +94,7 @@ def citations_from_answer(answer: str, source_index: dict[str, RetrievedChunk]) 
                 document_id=chunk.document_id or ("policy_pdf" if chunk.source_type == "kb_a" else "unknown"),
                 page_num=chunk.page_num,
                 section=normalize_citation_section(chunk.section),
-                excerpt=chunk.chunk_text[:100].strip(),
+                excerpt=chunk.chunk_text[:EXCERPT_MAX_CHARS].strip(),
             )
         )
 
@@ -115,7 +116,7 @@ def fallback_citations(chunks: Sequence[RetrievedChunk], limit: int = 4) -> list
                 document_id=chunk.document_id or ("policy_pdf" if chunk.source_type == "kb_a" else "unknown"),
                 page_num=chunk.page_num,
                 section=normalize_citation_section(chunk.section),
-                excerpt=chunk.chunk_text[:100].strip(),
+                excerpt=chunk.chunk_text[:EXCERPT_MAX_CHARS].strip(),
             )
         )
         if len(citations) >= limit:

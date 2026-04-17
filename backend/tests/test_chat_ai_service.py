@@ -447,6 +447,65 @@ async def test_handle_chat_event_deadline_fallback_when_no_mention_or_dispute(mo
     assert response.metadata["deadline_type"] == "acknowledgment"
 
 
+async def test_handle_chat_event_participant_joined_should_not_invoke_deadline_alert(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    deadline_called = False
+
+    async def fake_deadline_alert(case_id: str, *, stage: ChatStage):
+        nonlocal deadline_called
+        deadline_called = True
+        return None
+
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", fake_deadline_alert)
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="system",
+        message_text="",
+        participants=[
+            Participant(user_id="1", role="owner"),
+            Participant(user_id="2", role="adjuster"),
+        ],
+        invite_sent=True,
+        trigger=ChatEventTrigger.PARTICIPANT_JOINED,
+    )
+
+    await chat_ai_service.handle_chat_event(event)
+    # PARTICIPANT_JOINED should either be handled with a stage-transition message
+    # or short-circuit before the ambient deadline poll. It should not silently
+    # piggy-back on maybe_get_deadline_alert.
+    assert deadline_called is False
+
+
+async def test_handle_chat_event_policy_indexed_stage_3_should_not_invoke_deadline_alert(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    deadline_called = False
+
+    async def fake_deadline_alert(case_id: str, *, stage: ChatStage):
+        nonlocal deadline_called
+        deadline_called = True
+        return None
+
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", fake_deadline_alert)
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="system",
+        message_text="",
+        participants=[
+            Participant(user_id="1", role="owner"),
+            Participant(user_id="2", role="adjuster"),
+        ],
+        invite_sent=True,
+        trigger=ChatEventTrigger.POLICY_INDEXED,
+    )
+
+    await chat_ai_service.handle_chat_event(event)
+    assert deadline_called is False
+
+
 async def test_handle_chat_event_soft_signal_non_mention_does_not_interject_when_classifier_is_negative(monkeypatch) -> None:
     from ai.chat import chat_ai_service
 

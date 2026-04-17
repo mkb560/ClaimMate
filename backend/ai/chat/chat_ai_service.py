@@ -171,6 +171,9 @@ async def handle_chat_event(event: ChatEvent) -> AIResponse | None:
         answer = await summarize_policy_highlights(event.case_id, stage)
         return _to_ai_response(answer, trigger=AITrigger.PROACTIVE, stage=stage)
 
+    if event.trigger in {ChatEventTrigger.PARTICIPANT_JOINED, ChatEventTrigger.POLICY_INDEXED}:
+        return None
+
     if event.trigger == ChatEventTrigger.MESSAGE:
         if contains_ai_mention(event.message_text):
             question = extract_ai_question(event.message_text)
