@@ -1,11 +1,16 @@
+import { getToken } from './auth'
+
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  'https://exasperatingly-unprologued-elease.ngrok-free.dev'
 
-console.log("API_BASE_URL =", JSON.stringify(API_BASE_URL));
-
-const NGROK_HEADERS = {
-  "ngrok-skip-browser-warning": "true",
-};
+function getAuthHeaders(): Record<string, string> {
+  const token = getToken()
+  return {
+    'ngrok-skip-browser-warning': 'true',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
 
 export type UploadPolicyResponse = {
   case_id: string;
@@ -174,7 +179,7 @@ export async function patchAccidentStageB(
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -192,7 +197,7 @@ export async function checkHealth() {
     method: "GET",
     cache: "no-store",
     headers: {
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
   });
 
@@ -208,7 +213,7 @@ export async function getDemoPolicies() {
     method: "GET",
     cache: "no-store",
     headers: {
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
   });
 
@@ -225,7 +230,7 @@ export async function getCasePolicyStatus(caseId: string) {
     method: "GET",
     cache: "no-store",
     headers: {
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
   });
 
@@ -242,7 +247,7 @@ export async function seedDemoPolicy(caseId: string, policyKey?: string) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(policyKey ? { policy_key: policyKey } : {}),
   });
@@ -263,7 +268,7 @@ export async function uploadPolicy(caseId: string, file: File) {
     method: "POST",
     body: formData,
     headers: {
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
   });
 
@@ -280,7 +285,7 @@ export async function askPolicyQuestion(caseId: string, question: string) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ question }),
   });
@@ -298,7 +303,7 @@ export async function getCaseSnapshot(caseId: string) {
     method: "GET",
     cache: "no-store",
     headers: {
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
   });
 
@@ -318,7 +323,7 @@ export async function patchAccidentStageA(
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -335,7 +340,7 @@ export async function generateAccidentReport(caseId: string) {
   const response = await fetch(`${API_BASE_URL}/cases/${caseId}/accident/report`, {
     method: "POST",
     headers: {
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
   });
 
@@ -352,7 +357,7 @@ export async function sendChatEvent(caseId: string, payload: ChatEventRequest) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -401,7 +406,7 @@ export async function getChatMessages(
     {
       method: "GET",
       cache: "no-store",
-      headers: { ...NGROK_HEADERS },
+      headers: { ...getAuthHeaders() },
     }
   );
 
@@ -428,7 +433,7 @@ export async function sendChatMessage(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...NGROK_HEADERS,
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
         message_text: messageText,
@@ -452,7 +457,7 @@ export async function createCase(caseId?: string) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(caseId ? { case_id: caseId } : {}),
   });
@@ -468,7 +473,7 @@ export async function createCase(caseId?: string) {
 export async function deleteCase(caseId: string) {
   const response = await fetch(`${API_BASE_URL}/cases/${caseId}`, {
     method: "DELETE",
-    headers: { ...NGROK_HEADERS },
+    headers: { ...getAuthHeaders() },
   });
 
   if (!response.ok && response.status !== 404) {
@@ -487,7 +492,7 @@ export async function patchClaimDates(
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        ...NGROK_HEADERS,
+        ...getAuthHeaders(),
       },
       body: JSON.stringify(dates),
     }
@@ -507,7 +512,7 @@ export async function getAccidentReport(caseId: string) {
     {
       method: "GET",
       cache: "no-store",
-      headers: { ...NGROK_HEADERS },
+      headers: { ...getAuthHeaders() },
     }
   );
 
@@ -523,7 +528,7 @@ export async function seedAccidentDemoCase(caseId: string) {
   const response = await fetch(`${API_BASE_URL}/cases/${caseId}/demo/seed-accident`, {
     method: "POST",
     headers: {
-      ...NGROK_HEADERS,
+      ...getAuthHeaders(),
     },
   });
 
@@ -533,4 +538,58 @@ export async function seedAccidentDemoCase(caseId: string) {
   }
 
   return (await response.json()) as SeedAccidentDemoResponse;
+}
+
+export type AuthUser = {
+  id: string
+  email: string
+  display_name: string | null
+}
+
+export type AuthResponse = {
+  access_token: string
+  token_type: string
+  user: AuthUser
+}
+
+export async function loginUser(
+  email: string,
+  password: string
+): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ email, password }),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || 'Login failed')
+  }
+  return response.json() as Promise<AuthResponse>
+}
+
+export async function registerUser(
+  email: string,
+  password: string,
+  display_name?: string
+): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ email, password, display_name }),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || 'Registration failed')
+  }
+  return response.json() as Promise<AuthResponse>
+}
+
+export async function getMe(): Promise<AuthUser> {
+  const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    headers: getAuthHeaders(),
+    cache: 'no-store',
+  })
+  if (!response.ok) throw new Error('Not authenticated')
+  return response.json() as Promise<AuthUser>
 }
