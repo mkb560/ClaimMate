@@ -15,4 +15,7 @@ async def healthcheck(request: Request) -> dict[str, object]:
             ai_config.database_url and ai_config.openai_api_key and not request.app.state.ai_bootstrap_error
         ),
         "ai_bootstrap_error": request.app.state.ai_bootstrap_error,
+        "auth_mode": ai_config.auth_mode,
+        "policy_storage_ready": getattr(request.app.state, "policy_storage_ready", None),
+        "policy_storage_error": getattr(request.app.state, "policy_storage_error", None),
     }

@@ -52,6 +52,8 @@ def _build_client(monkeypatch, tmp_path: Path) -> TestClient:
     for _cfg in {id(c): c for c in (deps.ai_config, health.ai_config, main_mod.ai_config)}.values():
         monkeypatch.setattr(_cfg, "database_url", _db_url)
         monkeypatch.setattr(_cfg, "openai_api_key", _api_key)
+        monkeypatch.setattr(_cfg, "auth_mode", "off")
+        monkeypatch.setattr(_cfg, "jwt_secret_key", "")
     monkeypatch.setattr("app.paths.LOCAL_POLICY_STORAGE_ROOT", tmp_path)
     monkeypatch.setattr("app.case_service.ensure_case", AsyncMock(return_value=None))
     monkeypatch.setattr(main_mod, "create_ai_engine", lambda: _DummyEngine())

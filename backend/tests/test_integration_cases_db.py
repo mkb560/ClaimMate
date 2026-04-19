@@ -16,6 +16,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ai.config import ai_config
+from app import auth_deps, deps as app_deps
+from app.routers import health as health_router
 
 import main
 
@@ -31,10 +33,16 @@ pytestmark = pytest.mark.integration
 def integration_client() -> TestClient:
     if not _database_configured():
         pytest.skip("DATABASE_URL is not set (e.g. copy .env.example to .env and point at your pgvector container).")
+    for cfg in {
+        id(c): c
+        for c in (ai_config, main.ai_config, auth_deps.ai_config, app_deps.ai_config, health_router.ai_config)
+    }.values():
+        setattr(cfg, "auth_mode", "off")
+        setattr(cfg, "jwt_secret_key", "")
     with TestClient(main.app) as client:
-        health = client.get("/health")
-        assert health.status_code == 200
-        err = health.json().get("ai_bootstrap_error")
+        health_response = client.get("/health")
+        assert health_response.status_code == 200
+        err = health_response.json().get("ai_bootstrap_error")
         if err:
             pytest.skip(f"AI bootstrap failed against DATABASE_URL: {err}")
         yield client

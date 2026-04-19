@@ -30,6 +30,7 @@
 - `DEMO_PLAYBOOK_ZH.md`：固定 demo 路径、问题顺序和展示重点。
 - `REMOTE_SHARED_BACKEND_ZH.md`：把本机后端通过公网共享给远程队友的说明。
 - `ACCIDENT_CHAT_DEMO_ASSETS_ZH.md`：固定事故流程与 chat demo 资产、脚本和样例输出。
+- `CLOUD_STAGING_ZH.md`：Railway 私测环境、云端数据 bootstrap、smoke/eval 与日志观测说明。
 
 ## 接口与行为契约
 
@@ -44,6 +45,7 @@
 
 - `TECHNICAL_MILESTONE_1_VIDEO_SCRIPT.md`：Technical Milestone 1 录屏操作与英文讲稿。
 - `TECHNICAL_MILESTONE_2_VIDEO_SCRIPT.md`：Technical Milestone 2 录屏操作与英文讲稿。
+- `TECHNICAL_MILESTONE_3_VIDEO_SCRIPT.md`：Technical Milestone 3 录屏操作与英文讲稿。
 - `BUSINESS_MILESTONE_1_VIDEO_SCRIPT.md`：Business Milestone 1 动画视频英文讲稿与 PPT 展示建议。
 - `BUSINESS_MILESTONE_2_VIDEO_SCRIPT.md`：Business Milestone 2 面向投资人的市场 / 商业研究视频讲稿与 PPT 建议。
 

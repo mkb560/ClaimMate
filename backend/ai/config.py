@@ -34,6 +34,8 @@ class AIConfig(BaseSettings):
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24 * 7
+    app_log_level: str = "INFO"
+    app_log_json: bool = True
 
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
