@@ -593,3 +593,61 @@ export async function getMe(): Promise<AuthUser> {
   if (!response.ok) throw new Error('Not authenticated')
   return response.json() as Promise<AuthUser>
 }
+
+export type CreateInviteResponse = {
+  case_id: string
+  token: string
+  invite_id: string
+  role: string
+  expires_at: string
+}
+
+export type InviteLookupResponse = {
+  case_id: string
+  role: string
+  expires_at: string
+}
+
+export async function createInvite(caseId: string, role = 'member'): Promise<CreateInviteResponse> {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/invites`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ role }),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || 'Create invite failed')
+  }
+  return response.json() as Promise<CreateInviteResponse>
+}
+
+export async function lookupInvite(token: string): Promise<InviteLookupResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/invites/lookup?token=${encodeURIComponent(token)}`,
+    { headers: { ...getAuthHeaders() }, cache: 'no-store' }
+  )
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || 'Invite not found')
+  }
+  return response.json() as Promise<InviteLookupResponse>
+}
+
+export async function acceptInvite(token: string): Promise<{ case_id: string; accepted: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/auth/accept-invite`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ token }),
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || 'Accept invite failed')
+  }
+  return response.json() as Promise<{ case_id: string; accepted: boolean }>
+}

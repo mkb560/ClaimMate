@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getChatMessages, ChatMessageRow } from '@/lib/api'
+import { getChatMessages, ChatMessageRow, createInvite } from '@/lib/api'
 import { useWebSocketChat, WsMessage } from '@/hooks/useWebSocketChat'
 import { ChatWindow } from '@/components/chat/ChatWindow'
 import { ChatInput } from '@/components/chat/ChatInput'
 import { DisplayMessage } from '@/components/chat/ChatBubble'
 import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 
 function rowToDisplay(row: ChatMessageRow): DisplayMessage {
   return {
@@ -43,10 +44,36 @@ export default function ChatPage() {
   const caseId = params.id
   const router = useRouter()
   const [history, setHistory] = useState<DisplayMessage[]>([])
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteLink, setInviteLink] = useState('')
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [copied, setCopied] = useState(false)
   const { messages: wsMessages, sendMessage, status } = useWebSocketChat(
     caseId,
     token
   )
+
+  async function handleCreateInvite() {
+    setInviteLoading(true)
+    setInviteError('')
+    try {
+      const res = await createInvite(caseId)
+      const link = `${window.location.origin}/invites/accept?token=${encodeURIComponent(res.token)}`
+      setInviteLink(link)
+      setShowInviteModal(true)
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Failed to create invite')
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
+  function handleCopy() {
+    navigator.clipboard.writeText(inviteLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   useEffect(() => {
     if (!token) {
@@ -76,6 +103,11 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-160px)] flex-col">
+      <div className="mb-2">
+        <Button variant="ghost" onClick={() => router.push(`/cases/${caseId}/report`)}>
+          ← Back
+        </Button>
+      </div>
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">
@@ -86,7 +118,37 @@ export default function ChatPage() {
             <span className={statusColor}>{status}</span>
           </p>
         </div>
+        <div className="flex flex-col items-end gap-1">
+          <Button variant="secondary" loading={inviteLoading} onClick={handleCreateInvite}>
+            Invite Someone
+          </Button>
+          {inviteError && (
+            <p className="text-xs text-red-500">{inviteError}</p>
+          )}
+        </div>
       </div>
+
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-bold text-slate-900">Invite Link</h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Share this link. The recipient will need to log in or register to join the case.
+            </p>
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <span className="flex-1 break-all text-xs text-slate-700">{inviteLink}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleCopy} className="flex-1">
+                {copied ? 'Copied!' : 'Copy Link'}
+              </Button>
+              <Button variant="secondary" onClick={() => setShowInviteModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <Card className="flex flex-1 flex-col overflow-hidden p-0">
         <ChatWindow messages={allMessages} />
         <div className="border-t border-slate-200 p-4">

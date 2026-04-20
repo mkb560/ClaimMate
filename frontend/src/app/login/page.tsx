@@ -1,24 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card } from '@/components/ui/Card'
 
-export default function LoginPage() {
+function LoginContent() {
   const { login, token } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next') || '/cases'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (token) router.replace('/cases')
-  }, [token, router])
+    if (token) router.replace(next)
+  }, [token, router, next])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +28,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      router.push('/cases')
+      router.push(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -77,5 +79,13 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }
