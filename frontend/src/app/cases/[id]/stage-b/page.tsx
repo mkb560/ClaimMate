@@ -10,6 +10,7 @@ import {
   EMPTY_STAGE_B,
 } from '@/components/accident/StageBForm'
 import { Spinner } from '@/components/ui/Spinner'
+import { Button } from '@/components/ui/Button'
 
 export default function StageBPage() {
   const { token } = useAuth()
@@ -90,6 +91,11 @@ export default function StageBPage() {
 
   return (
     <div>
+      <div className="mb-4">
+        <Button variant="ghost" onClick={() => router.push(`/cases/${caseId}/stage-a`)}>
+          ← Back
+        </Button>
+      </div>
       <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-900">
           Step 3: Accident Details

@@ -10,6 +10,7 @@ import {
   EMPTY_STAGE_A,
 } from '@/components/accident/StageAForm'
 import { Spinner } from '@/components/ui/Spinner'
+import { Button } from '@/components/ui/Button'
 
 function boolToTriState(v: unknown): 'true' | 'false' | 'unknown' {
   if (v === true) return 'true'
@@ -134,6 +135,11 @@ export default function StageAPage() {
 
   return (
     <div>
+      <div className="mb-4">
+        <Button variant="ghost" onClick={() => router.push(`/cases/${caseId}/policy`)}>
+          ← Back
+        </Button>
+      </div>
       <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-900">
           Step 2: Accident Basics

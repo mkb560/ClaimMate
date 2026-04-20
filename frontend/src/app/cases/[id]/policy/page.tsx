@@ -114,6 +114,9 @@ export default function PolicyPage() {
 
   return (
     <div className="space-y-6">
+      <Button variant="ghost" onClick={() => router.push('/cases')}>
+        ← Back to Cases
+      </Button>
       <Card>
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-900">

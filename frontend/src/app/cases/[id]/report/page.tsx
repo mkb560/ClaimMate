@@ -72,6 +72,9 @@ export default function ReportPage() {
 
   return (
     <div className="space-y-6">
+      <Button variant="ghost" onClick={() => router.push(`/cases/${caseId}/stage-b`)}>
+        ← Back
+      </Button>
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">
@@ -81,11 +84,18 @@ export default function ReportPage() {
             AI-generated summary of your accident details.
           </p>
         </div>
-        {!report && (
-          <Button loading={generating} onClick={handleGenerate}>
-            Generate Report
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {!report && (
+            <Button loading={generating} onClick={handleGenerate}>
+              Generate Report
+            </Button>
+          )}
+          {report && (
+            <Button variant="secondary" loading={generating} onClick={handleGenerate}>
+              Regenerate
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (
