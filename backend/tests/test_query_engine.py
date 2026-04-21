@@ -233,11 +233,16 @@ async def test_answer_policy_question_summarizes_policy_without_semantic_search(
 
     answer = await answer_policy_question("demo-case", "Can you summarize my policy in 3 bullet points?")
 
-    assert "Here are the main policy points" in answer.answer
-    assert answer.answer.count("\n- ") == 3
+    assert "Here are the main policy points I would pay attention to" in answer.answer
+    assert answer.answer.count("\n1. ") == 1
+    assert answer.answer.count("\n2. ") == 1
+    assert answer.answer.count("\n3. ") == 1
     assert "804 448 188" in answer.answer
     assert "$50,000 each person" in answer.answer
     assert "05/28/2025" in answer.answer
+    assert "Policy identity:" in answer.answer
+    assert "Core coverage snapshot:" in answer.answer
+    assert "Important flags:" in answer.answer
     assert len(answer.citations) >= 3
 
 

@@ -133,27 +133,32 @@ def _build_summary_answer(question: str, chunks: Sequence[RetrievedChunk]) -> An
             citations.append(_fact_citation(fact))
         return fact_refs[key]
 
-    bullets: list[str] = []
-
     document_type = _first_fact(facts, "document_type")
     policyholders = _first_fact(facts, "policyholders")
     policy_number = _first_fact(facts, "policy_number")
     policy_period = _first_fact(facts, "policy_period")
     insurer = _first_fact(facts, "insurer")
 
-    identity_parts: list[str] = []
+    points: list[str] = []
+    identity_bits: list[str] = []
+    identity_refs: list[str] = []
     if document_type:
-        identity_parts.append(f"the document is a {document_type.value} [{ref_for(document_type)}]")
+        identity_bits.append(f"this document looks like a {document_type.value}")
+        identity_refs.append(ref_for(document_type))
     if policyholders:
-        identity_parts.append(f"it lists {policyholders.value} as policyholder(s) [{ref_for(policyholders)}]")
+        identity_bits.append(f"it lists {policyholders.value} as the policyholder(s)")
+        identity_refs.append(ref_for(policyholders))
     if policy_number:
-        identity_parts.append(f"the policy number is {policy_number.value} [{ref_for(policy_number)}]")
+        identity_bits.append(f"the policy number is {policy_number.value}")
+        identity_refs.append(ref_for(policy_number))
     if policy_period:
-        identity_parts.append(f"the policy period is {policy_period.value} [{ref_for(policy_period)}]")
+        identity_bits.append(f"the policy period is {policy_period.value}")
+        identity_refs.append(ref_for(policy_period))
     if insurer:
-        identity_parts.append(f"the insurer listed is {insurer.value} [{ref_for(insurer)}]")
-    if identity_parts:
-        bullets.append("Policy identity: " + "; ".join(identity_parts) + ".")
+        identity_bits.append(f"the insurer shown is {insurer.value}")
+        identity_refs.append(ref_for(insurer))
+    if identity_bits:
+        points.append(f"Policy identity: {'; '.join(identity_bits)}. {''.join(f'[{ref}]' for ref in identity_refs)}")
 
     vehicle = _first_fact(facts, "vehicle_description")
     vin = _first_fact(facts, "vehicle_vin")
@@ -162,21 +167,38 @@ def _build_summary_answer(question: str, chunks: Sequence[RetrievedChunk]) -> An
     comprehensive = _first_fact(facts, "comprehensive_coverage")
     rental = _first_fact(facts, "rental_reimbursement")
 
-    coverage_parts: list[str] = []
+    coverage_bits: list[str] = []
+    coverage_refs: list[str] = []
     if vehicle:
-        coverage_parts.append(f"the listed vehicle is {vehicle.value} [{ref_for(vehicle)}]")
+        coverage_bits.append(f"the listed vehicle is {vehicle.value}")
+        coverage_refs.append(ref_for(vehicle))
     if vin:
-        coverage_parts.append(f"VIN {vin.value} [{ref_for(vin)}]")
+        coverage_bits.append(f"VIN {vin.value}")
+        coverage_refs.append(ref_for(vin))
     if liability:
-        coverage_parts.append(f"liability limits are {liability.value} [{ref_for(liability)}]")
-    if collision:
-        coverage_parts.append(f"collision coverage is listed as {collision.value} [{ref_for(collision)}]")
-    if comprehensive:
-        coverage_parts.append(f"comprehensive coverage is listed as {comprehensive.value} [{ref_for(comprehensive)}]")
-    if rental:
-        coverage_parts.append(f"rental reimbursement is listed as {rental.value} [{ref_for(rental)}]")
-    if coverage_parts:
-        bullets.append("Coverage snapshot: " + "; ".join(coverage_parts) + ".")
+        coverage_bits.append(f"the main liability limits are {liability.value}")
+        coverage_refs.append(ref_for(liability))
+    if coverage_bits:
+        points.append(f"Core coverage snapshot: {'; '.join(coverage_bits)}. {''.join(f'[{ref}]' for ref in coverage_refs)}")
+
+    optional_bits: list[str] = []
+    optional_refs: list[str] = []
+    not_purchased: list[str] = []
+    for label, fact in (
+        ("collision", collision),
+        ("comprehensive", comprehensive),
+        ("rental reimbursement", rental),
+    ):
+        if not fact:
+            continue
+        value = fact.value
+        if "not purchased" in value.lower():
+            not_purchased.append(label)
+        else:
+            optional_bits.append(f"{label} is listed as {value}")
+        optional_refs.append(ref_for(fact))
+    if not_purchased:
+        optional_bits.append(f"{', '.join(not_purchased)} are listed as not purchased")
 
     policy_change = _first_fact(facts, "policy_change")
     change_effective_date = _first_fact(facts, "change_effective_date")
@@ -186,44 +208,46 @@ def _build_summary_answer(question: str, chunks: Sequence[RetrievedChunk]) -> An
     identity_deductible = _first_fact(facts, "identity_theft_deductible")
     not_full_policy = _first_fact(facts, "not_full_policy")
 
-    notable_parts: list[str] = []
     if policy_change and change_effective_date:
-        notable_parts.append(
-            f"it records a policy change effective {change_effective_date.value}: {policy_change.value} [{ref_for(policy_change)}]"
-        )
+        optional_bits.append(f"there is a policy change effective {change_effective_date.value}: {policy_change.value}")
+        optional_refs.append(ref_for(policy_change))
     elif policy_change:
-        notable_parts.append(f"it records a policy change: {policy_change.value} [{ref_for(policy_change)}]")
+        optional_bits.append(f"there is a policy change: {policy_change.value}")
+        optional_refs.append(ref_for(policy_change))
     if discount_total:
-        notable_parts.append(f"discount savings are listed as {discount_total.value} [{ref_for(discount_total)}]")
+        optional_bits.append(f"discount savings are listed as {discount_total.value}")
+        optional_refs.append(ref_for(discount_total))
     if optional_coverage:
-        notable_parts.append(f"optional coverage includes {optional_coverage.value} [{ref_for(optional_coverage)}]")
+        optional_bits.append(f"optional coverage includes {optional_coverage.value}")
+        optional_refs.append(ref_for(optional_coverage))
     if identity_limit and identity_deductible:
-        notable_parts.append(
-            f"identity theft coverage has {identity_deductible.value} and a {identity_limit.value} limit [{ref_for(identity_limit)}]"
-        )
+        optional_bits.append(f"identity theft coverage has {identity_deductible.value} and a {identity_limit.value} limit")
+        optional_refs.append(ref_for(identity_limit))
     elif identity_limit:
-        notable_parts.append(f"identity theft coverage limit is {identity_limit.value} [{ref_for(identity_limit)}]")
+        optional_bits.append(f"identity theft coverage limit is {identity_limit.value}")
+        optional_refs.append(ref_for(identity_limit))
     if not_full_policy:
-        notable_parts.append(f"{not_full_policy.value} [{ref_for(not_full_policy)}]")
-    if notable_parts:
-        bullets.append("Notable details: " + "; ".join(notable_parts) + ".")
+        optional_bits.append(not_full_policy.value)
+        optional_refs.append(ref_for(not_full_policy))
+    if optional_bits:
+        points.append(f"Important flags: {'; '.join(optional_bits)}. {''.join(f'[{ref}]' for ref in optional_refs)}")
 
-    if not bullets:
+    if not points:
         citations = fallback_citations(chunks, limit=3)
         for index, citation in enumerate(citations, start=1):
             location = f"page {citation.page_num}" if citation.page_num is not None else "the indexed document"
             section = f", section {citation.section}" if citation.section else ""
-            bullets.append(
+            points.append(
                 f"Indexed source {index}: I found policy material from {citation.source_label} ({location}{section}). [S{index}]"
             )
 
     bullet_count = _requested_bullet_count(question)
-    selected = bullets[:bullet_count]
-    if len(selected) < bullet_count and bullets:
-        selected = bullets
+    selected = points[:bullet_count]
+    if len(selected) < bullet_count and points:
+        selected = points
 
-    answer = "Here are the main policy points I can summarize from the indexed document:\n" + "\n".join(
-        f"- {bullet}" for bullet in selected
+    answer = "Here are the main policy points I would pay attention to:\n" + "\n".join(
+        f"{index}. {point}" for index, point in enumerate(selected, start=1)
     )
     return AnswerResponse(answer=answer, citations=citations, disclaimer="")
 

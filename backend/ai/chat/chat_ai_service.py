@@ -59,6 +59,49 @@ POLICY_OR_COVERAGE_MARKERS = (
     "exclusion",
 )
 
+CASE_CONTEXT_MARKERS = (
+    "accident",
+    "incident",
+    "crash",
+    "collision",
+    "case",
+    "claim",
+    "what happened",
+    "scene",
+    "location",
+    "damage",
+    "police",
+    "injur",
+    "photo",
+    "missing",
+    "follow up",
+    "follow-up",
+    "next step",
+    "driver",
+    "party",
+    "vehicle",
+    "report",
+    "tow",
+    "repair",
+    "witness",
+)
+
+GENERAL_KNOWLEDGE_MARKERS = (
+    "capital city",
+    "capital of",
+    "weather",
+    "recipe",
+    "write code",
+    "python",
+    "javascript",
+    "stock price",
+    "sports",
+    "movie",
+    "song",
+    "translate",
+    "history of",
+)
+
 
 def _prefix_for_reference(text: str) -> str:
     cleaned = text.replace(DISCLAIMER_FOOTER, "").strip()
@@ -132,36 +175,43 @@ def _to_ai_response(answer, *, trigger: AITrigger, stage: ChatStage, metadata: d
 
 def _looks_like_case_context_question(question: str) -> bool:
     lowered = question.lower()
-    return any(
-        marker in lowered
-        for marker in (
-            "accident",
-            "incident",
-            "what happened",
-            "summary",
-            "where",
-            "location",
-            "when",
-            "time",
-            "damage",
-            "police",
-            "injur",
-            "photo",
-            "missing",
-            "follow up",
-            "follow-up",
-            "next step",
-            "driver",
-            "party",
-            "vehicle",
-            "report",
-        )
-    )
+    if any(marker in lowered for marker in CASE_CONTEXT_MARKERS):
+        return True
+    if "summary" in lowered:
+        return any(marker in lowered for marker in ("accident", "case", "claim", "incident", "report"))
+    if any(marker in lowered for marker in ("where", "when", "time")):
+        return any(marker in lowered for marker in ("happen", "occur", "accident", "incident", "crash", "collision"))
+    return False
 
 
 def _looks_like_policy_or_coverage_question(question: str) -> bool:
     lowered = question.lower()
     return any(marker in lowered for marker in POLICY_OR_COVERAGE_MARKERS)
+
+
+def _looks_like_out_of_scope_question(question: str) -> bool:
+    lowered = question.lower()
+    if _looks_like_policy_or_coverage_question(question) or _looks_like_case_context_question(question):
+        return False
+    return any(marker in lowered for marker in GENERAL_KNOWLEDGE_MARKERS)
+
+
+def _build_out_of_scope_response(stage: ChatStage, metadata: dict | None = None) -> AIResponse:
+    text = (
+        "I’m ClaimMate, so I should stay focused on this insurance claim rather than general trivia. "
+        "I can help with your policy, accident details, claim deadlines, dispute next steps, or documents to collect."
+        f"\n\n{DISCLAIMER_FOOTER}"
+    )
+    if stage == ChatStage.STAGE_3 and not text.startswith("For reference:"):
+        text = _prefix_for_reference(text)
+    response_metadata = {"stage": stage.value, "out_of_scope": True}
+    response_metadata.update(_public_response_metadata(metadata))
+    return AIResponse(
+        text=text,
+        citations=[],
+        trigger=AITrigger.MENTION,
+        metadata=response_metadata,
+    )
 
 
 def _rag_case_context_from_metadata(metadata: dict | None) -> dict | None:
@@ -324,6 +374,9 @@ async def _build_question_response(case_id: str, question: str, stage: ChatStage
         if metadata and metadata.get("direct_ai_chat") is True:
             case_context_response.metadata["direct_ai_chat"] = True
         return case_context_response
+
+    if _looks_like_out_of_scope_question(question):
+        return _build_out_of_scope_response(stage, metadata)
 
     answer = await _answer_policy_with_context(case_id, question, case_context=case_context)
     return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage, metadata=metadata)

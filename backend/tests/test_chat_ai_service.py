@@ -200,6 +200,68 @@ async def test_handle_chat_event_uses_saved_case_context_for_accident_questions(
     assert policy_called is False
 
 
+async def test_handle_chat_event_does_not_treat_general_where_question_as_case_context(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    async def fail_answer_policy_question(case_id: str, question: str, **kwargs):
+        raise AssertionError("General trivia should not fall through into policy RAG.")
+
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fail_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="@ai where is the capital city in the US",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+        metadata={
+            "case_chat_context": {
+                "summary": "Rear-end collision at a red light.",
+                "key_facts": ["Location: 3201 S Hoover St"],
+            },
+        },
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.MENTION
+    assert response.metadata["out_of_scope"] is True
+    assert "insurance claim" in response.text
+    assert "Rear-end collision" not in response.text
+
+
+async def test_handle_chat_event_still_answers_where_accident_happened(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    async def fail_answer_policy_question(case_id: str, question: str, **kwargs):
+        raise AssertionError("Accident location questions should use saved case context first.")
+
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fail_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="@ai where did the accident happen?",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+        metadata={
+            "case_chat_context": {
+                "summary": "Rear-end collision at a red light.",
+                "key_facts": ["Location: 3201 S Hoover St"],
+            },
+        },
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.metadata["case_context_answer"] is True
+    assert "3201 S Hoover St" in response.text
+
+
 async def test_handle_chat_event_passes_saved_case_context_to_policy_rag_for_coverage_questions(monkeypatch) -> None:
     from ai.chat import chat_ai_service
 
