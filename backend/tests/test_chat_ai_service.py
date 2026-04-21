@@ -1,8 +1,14 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from ai.dispute.semantic_detector import DisputeClassification
 from ai.rag.prompt_templates import DISCLAIMER_FOOTER
 from models.ai_types import AIResponse, AITrigger, AnswerResponse, ChatEvent, ChatEventTrigger, ChatStage, Participant
+
+
+class _EmptyOpenAICompletions:
+    async def create(self, **kwargs):
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=""))])
 
 
 async def test_handle_chat_event_requires_question_after_mention() -> None:
@@ -81,6 +87,63 @@ async def test_handle_chat_event_policy_indexed_stage_1(monkeypatch) -> None:
     response = await chat_ai_service.handle_chat_event(event)
     assert response is not None
     assert response.trigger == AITrigger.PROACTIVE
+
+
+async def test_open_chat_empty_model_response_falls_back_to_repair_checklist(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    monkeypatch.setattr(
+        chat_ai_service,
+        "get_openai_client",
+        lambda: SimpleNamespace(chat=SimpleNamespace(completions=_EmptyOpenAICompletions())),
+    )
+
+    response = await chat_ai_service._answer_open_chat_question(
+        "make me a checklist for my repair estimate conversation",
+        ChatStage.STAGE_1,
+        metadata={
+            "case_report_payload": {
+                "damage_summary": "rear bumper cracking and sensor warning lights",
+                "police_report_number": "LAPD-2026-0418",
+                "repair_shop_name": "USC Auto Body Center",
+                "adjuster_name": "Alicia Gomez",
+            }
+        },
+    )
+
+    assert response.metadata["open_chat_answer"] is True
+    assert "repair-estimate conversation checklist" in response.text
+    assert "rear bumper cracking" in response.text
+    assert "Alicia Gomez" in response.text
+    assert DISCLAIMER_FOOTER in response.text
+
+
+async def test_open_chat_empty_model_response_falls_back_to_chinese_summary(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    monkeypatch.setattr(
+        chat_ai_service,
+        "get_openai_client",
+        lambda: SimpleNamespace(chat=SimpleNamespace(completions=_EmptyOpenAICompletions())),
+    )
+
+    response = await chat_ai_service._answer_open_chat_question(
+        "用中文总结一下这个事故",
+        ChatStage.STAGE_1,
+        metadata={
+            "case_report_payload": {
+                "location_summary": "1200 S Figueroa St, Los Angeles, CA 90015",
+                "damage_summary": "rear bumper cracking and trunk misalignment",
+                "police_report_number": "LAPD-2026-0418",
+            }
+        },
+    )
+
+    assert response.metadata["open_chat_answer"] is True
+    assert "这个事故" in response.text
+    assert "追尾" in response.text
+    assert "LAPD-2026-0418" in response.text
+    assert DISCLAIMER_FOOTER in response.text
 
 
 async def test_handle_chat_event_mention_takes_precedence_over_deadline(monkeypatch) -> None:

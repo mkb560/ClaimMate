@@ -244,6 +244,20 @@ def _format_bullets(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items)
 
 
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+
+def _value_from_report(metadata: dict | None, key: str) -> str | None:
+    if not isinstance(metadata, dict):
+        return None
+    report_payload = metadata.get("case_report_payload")
+    if not isinstance(report_payload, dict):
+        return None
+    value = str(report_payload.get(key) or "").strip()
+    return value or None
+
+
 def _build_open_chat_context(metadata: dict | None) -> str:
     if not metadata:
         return "No saved case context is available."
@@ -279,6 +293,43 @@ def _build_open_chat_context(metadata: dict | None) -> str:
     return "\n".join(lines)[:5000] if lines else "No saved case context is available."
 
 
+def _build_open_chat_fallback(question: str, metadata: dict | None = None) -> str:
+    lowered = question.lower()
+    location = _value_from_report(metadata, "location_summary") or "the saved accident location"
+    damage = _value_from_report(metadata, "damage_summary") or "the saved vehicle damage"
+    police_report = _value_from_report(metadata, "police_report_number")
+    repair_shop = _value_from_report(metadata, "repair_shop_name") or "the repair shop"
+    adjuster = _value_from_report(metadata, "adjuster_name") or "the adjuster"
+
+    if "checklist" in lowered and ("repair" in lowered or "estimate" in lowered):
+        return (
+            "Here is a repair-estimate conversation checklist:\n"
+            f"- Confirm the estimate covers the visible damage: {damage}.\n"
+            "- Ask whether hidden damage, diagnostics, and sensor or ADAS recalibration are included.\n"
+            f"- Bring or upload photos, the police report number{f' ({police_report})' if police_report else ''}, "
+            "insurance-exchange details, and any shop notes.\n"
+            f"- Ask {adjuster} how supplements work if {repair_shop} finds more damage after teardown.\n"
+            "- Ask for a line-item explanation of any denied, reduced, or delayed repair items."
+        )
+
+    if _contains_cjk(question):
+        return (
+            f"这个事故可以这样总结：你的车辆在 {location} 附近发生追尾事故；记录显示车辆有损伤，"
+            f"主要包括 {damage}。"
+            f"{f' 警方记录号是 {police_report}。' if police_report else ''}"
+            "建议继续保留照片、维修估价、保险沟通记录，并让理赔员用书面方式说明下一步。"
+        )
+
+    if "legal advice" in lowered or "compensation" in lowered or "guarantee" in lowered:
+        return (
+            "I can't provide legal advice, exact compensation amounts, or a guaranteed claim outcome. "
+            "A safer next step is to organize the repair estimate, photos, police report, policy pages, "
+            "and written insurer responses, then ask the adjuster for a written coverage and payment explanation."
+        )
+
+    return "I’m not sure how to answer that yet, but I can still help with the claim details."
+
+
 async def _answer_open_chat_question(
     question: str,
     stage: ChatStage,
@@ -301,7 +352,7 @@ async def _answer_open_chat_question(
         max_completion_tokens=700,
     )
     raw_text = (response.choices[0].message.content or "").strip()
-    text = raw_text or "I’m not sure how to answer that yet, but I can still help with the claim details."
+    text = raw_text or _build_open_chat_fallback(question, metadata)
     if DISCLAIMER_FOOTER not in text:
         text = f"{text}\n\n{DISCLAIMER_FOOTER}"
     if stage == ChatStage.STAGE_3 and not text.startswith("For reference:"):
