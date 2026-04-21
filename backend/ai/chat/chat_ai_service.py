@@ -269,6 +269,14 @@ def _format_bullets(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items)
 
 
+def _fact_value_from_key_facts(key_facts: list[str], label: str) -> str | None:
+    prefix = f"{label}:"
+    for item in key_facts:
+        if item.lower().startswith(prefix.lower()):
+            return item.split(":", 1)[1].strip()
+    return None
+
+
 def _build_case_context_response(question: str, stage: ChatStage, metadata: dict | None) -> AIResponse | None:
     if not metadata or not _looks_like_case_context_question(question):
         return None
@@ -298,6 +306,13 @@ def _build_case_context_response(question: str, stage: ChatStage, metadata: dict
             lines.append(_format_bullets(follow_up_items))
         else:
             lines.append("Based on the saved accident context, I do not see open follow-up items right now.")
+    elif any(marker in lowered for marker in ("where", "location")):
+        response_kind = "location"
+        location = _fact_value_from_key_facts(key_facts, "Location")
+        if not location and isinstance(report_payload, dict):
+            location = str(report_payload.get("location_summary") or "").strip()
+        if location:
+            lines.append(f"The saved accident location is {location}.")
     elif "damage" in lowered and isinstance(report_payload, dict):
         response_kind = "damage"
         damage = str(report_payload.get("damage_summary") or "").strip()
@@ -306,6 +321,13 @@ def _build_case_context_response(question: str, stage: ChatStage, metadata: dict
             lines.append(f"Damage summary: {damage}")
         if narrative:
             lines.append(f"Relevant narrative: {narrative}")
+    elif any(marker in lowered for marker in ("when", "time")):
+        response_kind = "time"
+        accident_time = _fact_value_from_key_facts(key_facts, "Accident time")
+        if not accident_time and isinstance(report_payload, dict):
+            accident_time = str(report_payload.get("occurrence_time") or "").strip()
+        if accident_time:
+            lines.append(f"The saved accident time is {accident_time}.")
     elif any(marker in lowered for marker in ("driver", "party", "vehicle")):
         response_kind = "parties"
         rows = report_payload.get("party_comparison_rows") if isinstance(report_payload, dict) else None

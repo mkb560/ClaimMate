@@ -96,6 +96,11 @@ def _first_fact(facts: dict[str, list[PolicyFact]], key: str) -> PolicyFact | No
     return values[0] if values else None
 
 
+def _with_indefinite_article(text: str) -> str:
+    article = "an" if text[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
+    return f"{article} {text}"
+
+
 def _fact_citation(fact: PolicyFact) -> Citation:
     return Citation(
         source_type="kb_a",
@@ -143,7 +148,7 @@ def _build_summary_answer(question: str, chunks: Sequence[RetrievedChunk]) -> An
     identity_bits: list[str] = []
     identity_refs: list[str] = []
     if document_type:
-        identity_bits.append(f"this document looks like a {document_type.value}")
+        identity_bits.append(f"this document looks like {_with_indefinite_article(document_type.value)}")
         identity_refs.append(ref_for(document_type))
     if policyholders:
         identity_bits.append(f"it lists {policyholders.value} as the policyholder(s)")
@@ -198,7 +203,7 @@ def _build_summary_answer(question: str, chunks: Sequence[RetrievedChunk]) -> An
             optional_bits.append(f"{label} is listed as {value}")
         optional_refs.append(ref_for(fact))
     if not_purchased:
-        optional_bits.append(f"{', '.join(not_purchased)} are listed as not purchased")
+        optional_bits.append(f"the following are listed as not purchased: {', '.join(not_purchased)}")
 
     policy_change = _first_fact(facts, "policy_change")
     change_effective_date = _first_fact(facts, "change_effective_date")
