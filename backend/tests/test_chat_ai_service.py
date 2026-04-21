@@ -394,6 +394,64 @@ async def test_handle_chat_event_passes_saved_case_context_to_policy_rag_for_cov
     }
 
 
+async def test_handle_chat_event_routes_regulatory_rule_to_rag_even_with_saved_case_context(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    captured: dict[str, object] = {}
+
+    async def fake_answer_policy_question(case_id: str, question: str, **kwargs):
+        captured["case_id"] = case_id
+        captured["question"] = question
+        captured["case_context"] = kwargs.get("case_context")
+        return AnswerResponse(
+            answer=f"The insurer must acknowledge receipt within 15 calendar days. [S1]\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    async def fail_open_chat_question(question: str, stage: ChatStage, metadata=None):
+        raise AssertionError("Regulatory claim-rule questions should stay on the grounded RAG path.")
+
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "_answer_open_chat_question", fail_open_chat_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="@AI What is the 15-day acknowledgment rule for a California claim?",
+        participants=[
+            Participant(user_id="owner-1", role="owner"),
+            Participant(user_id="adjuster-1", role="adjuster"),
+        ],
+        invite_sent=True,
+        trigger=ChatEventTrigger.MESSAGE,
+        metadata={
+            "case_chat_context": {
+                "summary": "Rear-end collision at a red light.",
+                "key_facts": ["Location: 3201 S Hoover St"],
+            },
+        },
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+
+    assert response is not None
+    assert response.text.startswith("For reference:")
+    assert "15 calendar days" in response.text
+    assert response.metadata["stage"] == ChatStage.STAGE_3.value
+    assert response.metadata.get("open_chat_answer") is None
+    assert captured["case_id"] == "case-1"
+    assert captured["question"] == "What is the 15-day acknowledgment rule for a California claim?"
+    assert captured["case_context"] == {
+        "chat_context": {
+            "summary": "Rear-end collision at a red light.",
+            "key_facts": ["Location: 3201 S Hoover St"],
+        },
+        "report_payload": None,
+    }
+
+
 async def test_handle_chat_event_non_mention_dispute_takes_precedence_over_deadline(monkeypatch) -> None:
     from ai.chat import chat_ai_service
 

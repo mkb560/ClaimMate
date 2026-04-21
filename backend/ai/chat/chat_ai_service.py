@@ -15,6 +15,7 @@ from ai.dispute.semantic_detector import STATUTE_BY_DISPUTE_TYPE, classify_dispu
 from ai.rag.prompt_templates import DISCLAIMER_FOOTER
 from ai.rag.prompt_templates import NOT_ENOUGH_INFO_MESSAGE
 from ai.rag.query_engine import answer_dispute_question, answer_policy_question, summarize_policy_highlights
+from ai.rag.regulatory_fact_extractor import is_structured_regulatory_question
 from models.ai_types import AIResponse, AITrigger, AnswerResponse, ChatEvent, ChatEventTrigger, ChatStage
 
 
@@ -149,6 +150,10 @@ def _to_ai_response(answer, *, trigger: AITrigger, stage: ChatStage, metadata: d
 def _looks_like_policy_or_coverage_question(question: str) -> bool:
     lowered = question.lower()
     return any(marker in lowered for marker in POLICY_OR_COVERAGE_MARKERS)
+
+
+def _should_try_grounded_answer(question: str) -> bool:
+    return _looks_like_policy_or_coverage_question(question) or is_structured_regulatory_question(question)
 
 
 def _rag_case_context_from_metadata(metadata: dict | None) -> dict | None:
@@ -311,7 +316,7 @@ async def _build_question_response(case_id: str, question: str, stage: ChatStage
             case_context=case_context,
         )
 
-    if case_context and not _looks_like_policy_or_coverage_question(question):
+    if case_context and not _should_try_grounded_answer(question):
         return await _answer_open_chat_question(question, stage, metadata)
 
     answer = await _answer_policy_with_context(case_id, question, case_context=case_context)
