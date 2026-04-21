@@ -359,6 +359,46 @@ async def test_answer_policy_question_builds_accident_coverage_checklist_without
     assert any(citation.source_type == "kb_a" for citation in answer.citations)
 
 
+async def test_accident_coverage_checklist_keeps_case_context_concise(monkeypatch) -> None:
+    async def fake_list_policy_chunks(case_id: str, limit=None):
+        return [
+            RetrievedChunk(
+                source_type="kb_a",
+                chunk_text=(
+                    "Coverage detail\n"
+                    "Auto Collision Insurance $500 deductible\n"
+                    "Property Damage $50,000 each occurrence"
+                ),
+                document_id="policy_pdf",
+                page_num=2,
+                section="COVERAGE DETAIL",
+                metadata={"source_label": "Your Policy (policy.pdf)"},
+            )
+        ]
+
+    monkeypatch.setattr(query_engine, "list_policy_chunks", fake_list_policy_chunks)
+
+    answer = await answer_policy_question(
+        "demo-case",
+        "Based on my accident, what policy coverage should I check?",
+        case_context={
+            "report_payload": {
+                "accident_summary": (
+                    "ClaimMate accident report for case demo-case. Reported location: 1200 S Figueroa St. "
+                    "Scene summary: Rear-end collision at a red light near Crypto.com Arena. "
+                    "Damage summary: Visible damage includes rear bumper cracking and trunk misalignment. "
+                    "Detailed narrative: I was fully stopped when the other driver hit my rear bumper."
+                )
+            }
+        },
+    )
+
+    first_line = answer.answer.splitlines()[1]
+    assert "Rear-end collision at a red light near Crypto.com Arena" in first_line
+    assert "Detailed narrative" not in answer.answer
+    assert len(answer.citations[0].excerpt) < 120
+
+
 async def test_generate_answer_uses_rescue_when_initial_answer_has_no_citations() -> None:
     responses = iter(
         [

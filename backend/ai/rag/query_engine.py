@@ -113,13 +113,16 @@ def _fact_citation(fact: PolicyFact) -> Citation:
 
 
 def _chunk_citation(chunk: RetrievedChunk) -> Citation:
+    excerpt = chunk.chunk_text[:160].strip()
+    if chunk.source_type == "case_context":
+        excerpt = _compact_case_context_excerpt(chunk.chunk_text)
     return Citation(
         source_type=chunk.source_type,
         source_label=source_label_for_chunk(chunk),
         document_id=chunk.document_id or ("policy_pdf" if chunk.source_type == "kb_a" else "unknown"),
         page_num=chunk.page_num,
         section=normalize_citation_section(chunk.section),
-        excerpt=chunk.chunk_text[:160].strip(),
+        excerpt=excerpt,
     )
 
 
@@ -257,11 +260,34 @@ def _build_summary_answer(question: str, chunks: Sequence[RetrievedChunk]) -> An
     return AnswerResponse(answer=answer, citations=citations, disclaimer="")
 
 
+def _compact_case_context_excerpt(text: str, *, max_chars: int = 220) -> str:
+    cleaned = " ".join(text.split())
+    if not cleaned:
+        return "Saved accident context."
+
+    if "Scene summary:" in cleaned:
+        scene = cleaned.split("Scene summary:", 1)[1]
+        for marker in ("Damage summary:", "Detailed narrative:", "Injuries reported:", "Police called:"):
+            if marker in scene:
+                scene = scene.split(marker, 1)[0]
+                break
+        cleaned = scene.strip(" .")
+    else:
+        for line in text.splitlines():
+            if line.startswith("Accident summary:"):
+                cleaned = line.removeprefix("Accident summary:").strip()
+                break
+
+    if len(cleaned) <= max_chars:
+        return cleaned
+    return cleaned[: max_chars - 1].rstrip(" ,.;") + "..."
+
+
 def _short_case_summary(context_chunk: RetrievedChunk) -> str:
     for line in context_chunk.chunk_text.splitlines():
         if line.startswith("Accident summary:"):
-            return line.removeprefix("Accident summary:").strip()
-    return context_chunk.chunk_text.splitlines()[0].strip()
+            return _compact_case_context_excerpt(line)
+    return _compact_case_context_excerpt(context_chunk.chunk_text)
 
 
 def _build_accident_coverage_answer(
