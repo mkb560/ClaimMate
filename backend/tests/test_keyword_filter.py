@@ -14,7 +14,20 @@ def test_soft_trigger_requires_two_matches() -> None:
     assert signal.confidence == 0.6
 
 
+def test_common_amount_dispute_phrasing_is_a_hard_signal() -> None:
+    signal = detect_dispute_signal("I disagree with the repair amount; what should I ask for?")
+    assert signal.triggered is True
+    assert signal.confidence == 0.9
+    assert "disagree with the repair amount" in signal.matched
+
+
+def test_common_no_response_phrasing_is_a_hard_signal() -> None:
+    signal = detect_dispute_signal("The insurer has not responded for two weeks, what should I do?")
+    assert signal.triggered is True
+    assert signal.confidence == 0.9
+    assert "has not responded" in signal.matched
+
+
 def test_soft_trigger_does_not_fire_with_one_match() -> None:
     signal = detect_dispute_signal("This feels unfair.")
     assert signal.triggered is False
-

@@ -74,6 +74,9 @@ Rules:
 4. Do not invent case facts or policy facts that are not in the provided context.
 5. Keep the answer concise, usually 1 to 4 short sentences.
 6. If the question is unrelated to insurance, answer it, then gently offer to help with the claim if useful.
+7. If the user asks for a draft, checklist, template, summary, or translation, complete the task directly using the saved context when relevant.
+8. If the user asks in another language, answer in that language.
+9. If the user asks for legal advice, exact compensation, or a guaranteed outcome, say you cannot provide that certainty and give safe practical next steps.
 """
 
 
@@ -131,9 +134,30 @@ def _dispute_type_from_signal(signal: DisputeSignal) -> str:
     matched = {item.lower() for item in signal.matched}
     if matched & {"denied my claim", "claim denied", "refuse to pay", "rejection letter"}:
         return "DENIAL"
-    if matched & {"underpaid", "wrong amount", "too low"}:
+    if matched & {
+        "underpaid",
+        "wrong amount",
+        "too low",
+        "disagree with the repair amount",
+        "disagree with the estimate",
+        "dispute the repair amount",
+        "repair estimate is too low",
+        "settlement amount is too low",
+        "repair amount",
+        "settlement amount",
+    }:
         return "AMOUNT"
-    if matched & {"delay", "no response", "ignored"}:
+    if matched & {
+        "delay",
+        "delayed",
+        "no response",
+        "ignored",
+        "has not responded",
+        "have not responded",
+        "haven't responded",
+        "not responded",
+        "not responding",
+    }:
         return "DELAY"
     return "OTHER"
 

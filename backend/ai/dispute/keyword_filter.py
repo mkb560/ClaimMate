@@ -10,6 +10,16 @@ HARD_TRIGGERS = (
     "underpaid",
     "refuse to pay",
     "wrong amount",
+    "disagree with the repair amount",
+    "disagree with the estimate",
+    "dispute the repair amount",
+    "repair estimate is too low",
+    "settlement amount is too low",
+    "has not responded",
+    "have not responded",
+    "haven't responded",
+    "not responded",
+    "not responding",
     "rejection letter",
 )
 
@@ -19,7 +29,10 @@ SOFT_TRIGGERS = (
     "not fair",
     "no response",
     "delay",
+    "delayed",
     "ignored",
+    "repair amount",
+    "settlement amount",
 )
 
 
@@ -42,4 +55,3 @@ def detect_dispute_signal(message_text: str) -> DisputeSignal:
         return DisputeSignal(triggered=True, confidence=0.6, matched=soft_matches)
 
     return DisputeSignal(triggered=False, confidence=0.0, matched=soft_matches)
-
