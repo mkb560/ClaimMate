@@ -38,6 +38,11 @@ DISPUTE_NEXT_STEPS = {
     },
 }
 
+INTERNAL_RESPONSE_METADATA_KEYS = {
+    "case_chat_context",
+    "case_report_payload",
+}
+
 
 def _prefix_for_reference(text: str) -> str:
     cleaned = text.replace(DISCLAIMER_FOOTER, "").strip()
@@ -46,6 +51,12 @@ def _prefix_for_reference(text: str) -> str:
 
 def _strip_disclaimer(text: str) -> str:
     return text.replace(DISCLAIMER_FOOTER, "").strip()
+
+
+def _public_response_metadata(metadata: dict | None) -> dict:
+    if not metadata:
+        return {}
+    return {key: value for key, value in metadata.items() if key not in INTERNAL_RESPONSE_METADATA_KEYS}
 
 
 def _dispute_helper_intro(stage: ChatStage) -> str:
@@ -94,14 +105,158 @@ def _to_ai_response(answer, *, trigger: AITrigger, stage: ChatStage, metadata: d
     if stage == ChatStage.STAGE_3 and not text.startswith("For reference:"):
         text = _prefix_for_reference(text)
     response_metadata = {"stage": stage.value}
-    if metadata:
-        response_metadata.update(metadata)
+    response_metadata.update(_public_response_metadata(metadata))
     return AIResponse(
         text=text,
         citations=answer.citations,
         trigger=trigger,
         metadata=response_metadata,
     )
+
+
+def _looks_like_case_context_question(question: str) -> bool:
+    lowered = question.lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "accident",
+            "incident",
+            "what happened",
+            "summary",
+            "where",
+            "location",
+            "when",
+            "time",
+            "damage",
+            "police",
+            "injur",
+            "photo",
+            "missing",
+            "follow up",
+            "follow-up",
+            "next step",
+            "driver",
+            "party",
+            "vehicle",
+            "report",
+        )
+    )
+
+
+def _as_text_list(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [str(item).strip() for item in values if str(item).strip()]
+
+
+def _format_bullets(items: list[str]) -> str:
+    return "\n".join(f"- {item}" for item in items)
+
+
+def _build_case_context_response(question: str, stage: ChatStage, metadata: dict | None) -> AIResponse | None:
+    if not metadata or not _looks_like_case_context_question(question):
+        return None
+
+    chat_context = metadata.get("case_chat_context")
+    report_payload = metadata.get("case_report_payload")
+    if not isinstance(chat_context, dict) and not isinstance(report_payload, dict):
+        return None
+
+    lowered = question.lower()
+    lines: list[str] = []
+    response_kind = "summary"
+
+    summary = ""
+    if isinstance(chat_context, dict):
+        summary = str(chat_context.get("summary") or "").strip()
+    if not summary and isinstance(report_payload, dict):
+        summary = str(report_payload.get("accident_summary") or "").strip()
+
+    key_facts = _as_text_list(chat_context.get("key_facts") if isinstance(chat_context, dict) else [])
+    follow_up_items = _as_text_list(chat_context.get("follow_up_items") if isinstance(chat_context, dict) else [])
+
+    if any(marker in lowered for marker in ("missing", "follow up", "follow-up", "next step")):
+        response_kind = "follow_up"
+        if follow_up_items:
+            lines.append("Based on the saved accident context, the current follow-up items are:")
+            lines.append(_format_bullets(follow_up_items))
+        else:
+            lines.append("Based on the saved accident context, I do not see open follow-up items right now.")
+    elif "damage" in lowered and isinstance(report_payload, dict):
+        response_kind = "damage"
+        damage = str(report_payload.get("damage_summary") or "").strip()
+        narrative = str(report_payload.get("detailed_narrative") or "").strip()
+        if damage:
+            lines.append(f"Damage summary: {damage}")
+        if narrative:
+            lines.append(f"Relevant narrative: {narrative}")
+    elif any(marker in lowered for marker in ("driver", "party", "vehicle")):
+        response_kind = "parties"
+        rows = report_payload.get("party_comparison_rows") if isinstance(report_payload, dict) else None
+        if isinstance(rows, list) and rows:
+            lines.append("The saved party comparison shows:")
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                label = row.get("field_label")
+                owner = row.get("owner_value")
+                other = row.get("other_party_value")
+                lines.append(f"- {label}: owner = {owner}; other party = {other}")
+    else:
+        if summary:
+            lines.append(f"Case summary: {summary}")
+        if key_facts:
+            lines.append("Key saved facts:")
+            lines.append(_format_bullets(key_facts))
+
+    if not lines:
+        return None
+
+    text = "\n".join(lines).strip() + f"\n\n{DISCLAIMER_FOOTER}"
+    if stage == ChatStage.STAGE_3 and not text.startswith("For reference:"):
+        text = _prefix_for_reference(text)
+    return AIResponse(
+        text=text,
+        citations=[],
+        trigger=AITrigger.MENTION,
+        metadata={"stage": stage.value, "case_context_answer": True, "case_context_kind": response_kind},
+    )
+
+
+async def _build_question_response(case_id: str, question: str, stage: ChatStage, metadata: dict | None = None) -> AIResponse:
+    if is_deadline_question(question):
+        try:
+            response = await explain_deadlines_for_case(case_id, stage=stage)
+        except KeyError:
+            return AIResponse(
+                text=(
+                    "I can't explain deadlines for this case because I could not find the saved case data. "
+                    f"Reload or recreate the case, then try again.\n\n{DISCLAIMER_FOOTER}"
+                ),
+                citations=[],
+                trigger=AITrigger.DEADLINE,
+                metadata={"stage": stage.value, "deadline_intent": "explainer_missing_case"},
+            )
+        response.metadata.update(_public_response_metadata(metadata))
+        return response
+
+    signal = detect_dispute_signal(question)
+    if signal.triggered:
+        return await _build_dispute_response(
+            case_id,
+            question,
+            stage,
+            signal=signal,
+            allow_policy_fallback=True,
+        )
+
+    if case_context_response := _build_case_context_response(question, stage, metadata):
+        if metadata and metadata.get("direct_ai_chat") is True:
+            case_context_response.metadata["direct_ai_chat"] = True
+        return case_context_response
+
+    answer = await answer_policy_question(case_id, question)
+    return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage, metadata=metadata)
 
 
 async def _build_dispute_response(
@@ -185,32 +340,17 @@ async def handle_chat_event(event: ChatEvent) -> AIResponse | None:
                     metadata={"stage": stage.value},
                 )
 
-            if is_deadline_question(question):
-                try:
-                    return await explain_deadlines_for_case(event.case_id, stage=stage)
-                except KeyError:
-                    return AIResponse(
-                        text=(
-                            "I can't explain deadlines for this case because I could not find the saved case data. "
-                            f"Reload or recreate the case, then try again.\n\n{DISCLAIMER_FOOTER}"
-                        ),
-                        citations=[],
-                        trigger=AITrigger.DEADLINE,
-                        metadata={"stage": stage.value, "deadline_intent": "explainer_missing_case"},
-                    )
+            return await _build_question_response(event.case_id, question, stage, event.metadata)
 
-            signal = detect_dispute_signal(question)
-            if signal.triggered:
-                return await _build_dispute_response(
+        if event.metadata.get("direct_ai_chat") is True:
+            question = event.message_text.strip()
+            if question:
+                return await _build_question_response(
                     event.case_id,
                     question,
                     stage,
-                    signal=signal,
-                    allow_policy_fallback=True,
+                    metadata=event.metadata,
                 )
-
-            answer = await answer_policy_question(event.case_id, question)
-            return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage)
 
         signal = detect_dispute_signal(event.message_text)
         if signal.triggered:

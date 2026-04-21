@@ -124,6 +124,82 @@ async def test_handle_chat_event_mention_takes_precedence_over_deadline(monkeypa
     assert deadline_called is False
 
 
+async def test_handle_chat_event_direct_ai_chat_answers_without_mention(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    async def fake_answer_policy_question(case_id: str, question: str):
+        assert question == "Does my policy include rental reimbursement?"
+        return AnswerResponse(
+            answer=f"Your policy includes rental reimbursement. [S1]\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="Does my policy include rental reimbursement?",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+        metadata={"direct_ai_chat": True},
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.MENTION
+    assert response.metadata["stage"] == ChatStage.STAGE_1.value
+    assert response.metadata["direct_ai_chat"] is True
+    assert "rental reimbursement" in response.text
+
+
+async def test_handle_chat_event_uses_saved_case_context_for_accident_questions(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    policy_called = False
+
+    async def fake_answer_policy_question(case_id: str, question: str):
+        nonlocal policy_called
+        policy_called = True
+        return AnswerResponse(
+            answer=f"Policy answer.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="What happened in the accident?",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+        metadata={
+            "direct_ai_chat": True,
+            "case_chat_context": {
+                "summary": "Rear-end collision at a red light. Both drivers exchanged insurance information.",
+                "key_facts": ["Police called: Yes", "Injuries reported: No"],
+                "follow_up_items": [],
+            },
+        },
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.MENTION
+    assert response.metadata["case_context_answer"] is True
+    assert response.metadata["direct_ai_chat"] is True
+    assert "case_chat_context" not in response.metadata
+    assert "Rear-end collision" in response.text
+    assert policy_called is False
+
+
 async def test_handle_chat_event_non_mention_dispute_takes_precedence_over_deadline(monkeypatch) -> None:
     from ai.chat import chat_ai_service
 

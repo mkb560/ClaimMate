@@ -127,6 +127,19 @@ def test_demo_policy_catalog_endpoint_returns_built_in_policies(monkeypatch, tmp
     }
 
 
+def test_openapi_exposes_bearer_auth_for_protected_routes(monkeypatch, tmp_path: Path) -> None:
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["components"]["securitySchemes"]["HTTPBearer"] == {
+        "type": "http",
+        "scheme": "bearer",
+    }
+    assert payload["paths"]["/auth/me"]["get"]["security"] == [{"HTTPBearer": []}]
+
+
 def test_get_policy_status_endpoint_returns_indexed_policy_summary(monkeypatch, tmp_path: Path) -> None:
     from app.routers import policy_ask
 
@@ -450,6 +463,8 @@ def test_chat_event_persists_user_and_ai_when_model_responds(monkeypatch, tmp_pa
     append_ai = AsyncMock()
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_user_message", append_user)
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_ai_message", append_ai)
+    monkeypatch.setattr(cases_and_accident.case_service, "get_stored_chat_context", AsyncMock(return_value=None))
+    monkeypatch.setattr(cases_and_accident.case_service, "get_stored_report", AsyncMock(return_value=None))
 
     async def fake_handle(event):
         assert event.case_id == "demo-case"
@@ -499,6 +514,8 @@ def test_chat_event_skips_ai_append_when_no_response(monkeypatch, tmp_path: Path
     append_ai = AsyncMock()
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_user_message", append_user)
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_ai_message", append_ai)
+    monkeypatch.setattr(cases_and_accident.case_service, "get_stored_chat_context", AsyncMock(return_value=None))
+    monkeypatch.setattr(cases_and_accident.case_service, "get_stored_report", AsyncMock(return_value=None))
     from app import chat_dispatch
 
     monkeypatch.setattr(chat_dispatch, "handle_chat_event", AsyncMock(return_value=None))
@@ -573,6 +590,8 @@ def test_post_chat_messages_triggers_dispatch(monkeypatch, tmp_path: Path) -> No
     monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_user_message", AsyncMock())
     monkeypatch.setattr(cases_and_accident.case_service, "append_chat_ai_message", AsyncMock())
+    monkeypatch.setattr(cases_and_accident.case_service, "get_stored_chat_context", AsyncMock(return_value=None))
+    monkeypatch.setattr(cases_and_accident.case_service, "get_stored_report", AsyncMock(return_value=None))
     from app import chat_dispatch
 
     monkeypatch.setattr(
@@ -589,6 +608,49 @@ def test_post_chat_messages_triggers_dispatch(monkeypatch, tmp_path: Path) -> No
 
     assert response.status_code == 200
     assert response.json()["response"]["text"] == "Simple"
+
+
+def test_post_chat_messages_marks_request_as_direct_ai_chat(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
+
+    captured: dict[str, object] = {}
+
+    async def fake_dispatch(case_id: str, **kwargs):
+        captured["case_id"] = case_id
+        captured.update(kwargs)
+        return {
+            "text": "Simple",
+            "citations": [],
+            "trigger": "MENTION",
+            "metadata": {"direct_ai_chat": True},
+        }
+
+    monkeypatch.setattr(cases_and_accident, "chat_event_dispatch", fake_dispatch)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/demo-case/chat/messages",
+            json={"message_text": "Does my policy include rental reimbursement?"},
+        )
+
+    assert response.status_code == 200
+    assert captured["message_text"] == "Does my policy include rental reimbursement?"
+    assert captured["metadata"] == {"source": "post_chat_messages", "direct_ai_chat": True}
 
 
 def test_delete_case_returns_204(monkeypatch, tmp_path: Path) -> None:

@@ -283,6 +283,23 @@ def _build_eval_cases() -> list[ChatEvalCase]:
             require_citations=True,
         ),
         ChatEvalCase(
+            name="direct_ai_chat_answers_without_mention",
+            event=ChatEvent(
+                case_id="case-1",
+                sender_role="owner",
+                message_text="Does this policy cover rental reimbursement?",
+                participants=_owner_participants(),
+                invite_sent=False,
+                trigger=ChatEventTrigger.MESSAGE,
+                metadata={"direct_ai_chat": True},
+            ),
+            expected_trigger=AITrigger.MENTION,
+            expected_stage=ChatStage.STAGE_1,
+            expected_text_contains=("rental reimbursement",),
+            expected_metadata={"direct_ai_chat": True},
+            require_citations=True,
+        ),
+        ChatEvalCase(
             name="stage_3_non_mention_dispute",
             event=ChatEvent(
                 case_id="case-1",

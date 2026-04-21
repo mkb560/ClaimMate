@@ -249,7 +249,7 @@ async def post_case_chat_message(
         participants=participants,
         invite_sent=body.invite_sent,
         trigger=ChatEventTrigger.MESSAGE,
-        metadata={"source": "post_chat_messages"},
+        metadata={"source": "post_chat_messages", "direct_ai_chat": True},
         occurred_at=None,
     )
     return {"case_id": normalized, "response": result}

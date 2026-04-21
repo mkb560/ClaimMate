@@ -4,7 +4,8 @@ import uuid
 from dataclasses import dataclass
 
 import jwt
-from fastapi import Header, HTTPException
+from fastapi import HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ai.config import ai_config
 from app.auth_core import decode_access_token
@@ -20,6 +21,9 @@ class AuthContext:
     user: UserRow | None
 
 
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
 def _normalize_mode() -> str:
     m = (ai_config.auth_mode or "off").strip().lower()
     if m not in ("off", "optional", "required"):
@@ -27,12 +31,14 @@ def _normalize_mode() -> str:
     return m
 
 
-async def get_auth_context(authorization: str | None = Header(None)) -> AuthContext:
+async def get_auth_context(
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),
+) -> AuthContext:
     mode = _normalize_mode()
-    if not authorization or not authorization.startswith("Bearer "):
+    if credentials is None or credentials.scheme.lower() != "bearer":
         return AuthContext(mode=mode, user=None)
 
-    token = authorization.removeprefix("Bearer ").strip()
+    token = credentials.credentials.strip()
     if not token:
         return AuthContext(mode=mode, user=None)
 
