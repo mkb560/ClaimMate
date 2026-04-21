@@ -178,6 +178,132 @@ async def test_answer_policy_question_prefers_extended_structured_policy_facts_w
     assert "Not purchased" in answer.answer
 
 
+async def test_answer_policy_question_summarizes_policy_without_semantic_search(monkeypatch) -> None:
+    async def fake_list_policy_chunks(case_id: str, limit=None):
+        return [
+            RetrievedChunk(
+                source_type="kb_a",
+                chunk_text=(
+                    "Policyholders: Mingtao Owner\n"
+                    "Policy number: 804 448 188\n"
+                    "Policy period: Apr 4, 2025 - Oct 4, 2025\n"
+                    "Underwritten by: Allstate Vehicle and Property Insurance Company"
+                ),
+                document_id="policy_pdf",
+                page_num=1,
+                section="DECLARATIONS",
+                metadata={"source_label": "Your Policy (TEMP_PDF_FILE 2.pdf)"},
+            ),
+            RetrievedChunk(
+                source_type="kb_a",
+                chunk_text=(
+                    "Coverage detail for 2024 Hyundai Elantra\n"
+                    "Automobile Liability Insurance\n"
+                    "Bodily Injury $50,000 each person\n$100,000 each occurrence\n"
+                    "Property Damage $50,000 each occurrence\n"
+                    "Rental Reimbursement Not purchased*"
+                ),
+                document_id="policy_pdf",
+                page_num=2,
+                section="COVERAGE DETAIL",
+                metadata={"source_label": "Your Policy (TEMP_PDF_FILE 2.pdf)"},
+            ),
+            RetrievedChunk(
+                source_type="kb_a",
+                chunk_text=(
+                    "The following change(s) are effective as of 05/28/2025: "
+                    "Added Identity Theft Expenses Coverage. Your discount savings for this policy period are: $123.45"
+                ),
+                document_id="policy_pdf",
+                page_num=3,
+                section="POLICY CHANGE",
+                metadata={"source_label": "Your Policy (TEMP_PDF_FILE 2.pdf)"},
+            ),
+        ]
+
+    async def fail_embed_query(question: str) -> list[float]:
+        raise AssertionError("Policy summary questions should not need semantic search.")
+
+    async def fail_generate_answer(**kwargs):
+        raise AssertionError("Policy summary questions should be answered deterministically.")
+
+    monkeypatch.setattr(query_engine, "list_policy_chunks", fake_list_policy_chunks)
+    monkeypatch.setattr(query_engine, "_embed_query", fail_embed_query)
+    monkeypatch.setattr(query_engine, "_generate_answer", fail_generate_answer)
+
+    answer = await answer_policy_question("demo-case", "Can you summarize my policy in 3 bullet points?")
+
+    assert "Here are the main policy points" in answer.answer
+    assert answer.answer.count("\n- ") == 3
+    assert "804 448 188" in answer.answer
+    assert "$50,000 each person" in answer.answer
+    assert "05/28/2025" in answer.answer
+    assert len(answer.citations) >= 3
+
+
+async def test_answer_policy_question_injects_saved_case_context_as_citable_source(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    class _FakeCompletions:
+        async def create(self, **kwargs):
+            calls.append(kwargs)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content="The saved accident context says the crash happened near USC. [S1]"
+                        )
+                    )
+                ]
+            )
+
+    async def fake_embed_query(question: str) -> list[float]:
+        return [0.0, 0.1]
+
+    async def fake_search_case_chunks(case_id: str, query_embedding: list[float], top_k=None):
+        return [
+            RetrievedChunk(
+                source_type="kb_a",
+                chunk_text="Collision coverage applies subject to policy terms.",
+                document_id="policy_pdf",
+                page_num=4,
+                section="COVERAGE DETAIL",
+                metadata={"source_label": "Your Policy (policy.pdf)"},
+            )
+        ]
+
+    async def fake_search_kb_b_chunks(query_embedding: list[float], *, top_k=None, document_ids=None):
+        return []
+
+    async def fake_list_policy_chunks(case_id: str, limit=None):
+        return await fake_search_case_chunks(case_id, [0.0, 0.1])
+
+    monkeypatch.setattr(query_engine, "_embed_query", fake_embed_query)
+    monkeypatch.setattr(query_engine, "search_case_chunks", fake_search_case_chunks)
+    monkeypatch.setattr(query_engine, "search_kb_b_chunks", fake_search_kb_b_chunks)
+    monkeypatch.setattr(query_engine, "list_policy_chunks", fake_list_policy_chunks)
+
+    answer = await answer_policy_question(
+        "demo-case",
+        "Based on my accident, what should I know about coverage?",
+        client=SimpleNamespace(chat=SimpleNamespace(completions=_FakeCompletions())),
+        case_context={
+            "chat_context": {
+                "summary": "Rear-end crash near USC.",
+                "key_facts": ["Location: 1200 S Figueroa St", "Police called: Yes"],
+                "party_comparison_rows": [
+                    {"field_label": "Vehicle", "owner_value": "2024 Hyundai", "other_party_value": "2019 Toyota"}
+                ],
+            }
+        },
+    )
+
+    assert "Saved Accident Context" in calls[0]["messages"][1]["content"]
+    assert "Rear-end crash near USC" in calls[0]["messages"][1]["content"]
+    assert answer.citations[0].source_type == "case_context"
+    assert answer.citations[0].source_label == "Saved Accident Context"
+
+
 async def test_generate_answer_uses_rescue_when_initial_answer_has_no_citations() -> None:
     responses = iter(
         [

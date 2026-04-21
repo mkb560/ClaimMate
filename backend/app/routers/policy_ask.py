@@ -27,6 +27,17 @@ class SeedPolicyBody(BaseModel):
     policy_key: str | None = Field(default=None, max_length=64)
 
 
+async def _load_saved_case_context(case_id: str) -> dict[str, object] | None:
+    chat_context = await case_service.get_stored_chat_context(case_id)
+    report_payload = await case_service.get_stored_report(case_id)
+    if not chat_context and not report_payload:
+        return None
+    return {
+        "chat_context": chat_context,
+        "report_payload": report_payload,
+    }
+
+
 @router.get("/demo/policies")
 async def get_demo_policy_catalog() -> dict[str, object]:
     return {"policies": list_demo_policies()}
@@ -115,7 +126,11 @@ async def ask_case_question(
     if not question:
         raise HTTPException(status_code=400, detail="question must not be empty.")
 
-    answer = await answer_policy_question(normalized_case_id, question)
+    case_context = await _load_saved_case_context(normalized_case_id)
+    if case_context:
+        answer = await answer_policy_question(normalized_case_id, question, case_context=case_context)
+    else:
+        answer = await answer_policy_question(normalized_case_id, question)
     return {
         "case_id": normalized_case_id,
         "question": question,

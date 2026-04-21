@@ -200,6 +200,57 @@ async def test_handle_chat_event_uses_saved_case_context_for_accident_questions(
     assert policy_called is False
 
 
+async def test_handle_chat_event_passes_saved_case_context_to_policy_rag_for_coverage_questions(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    captured: dict[str, object] = {}
+
+    async def fake_answer_policy_question(case_id: str, question: str, **kwargs):
+        captured["case_id"] = case_id
+        captured["question"] = question
+        captured["case_context"] = kwargs.get("case_context")
+        return AnswerResponse(
+            answer=f"Based on the accident context, check collision coverage. [S1]\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="Based on my accident, what policy coverage should I check?",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+        metadata={
+            "direct_ai_chat": True,
+            "case_chat_context": {
+                "summary": "Rear-end collision at a red light.",
+                "key_facts": ["Police called: Yes"],
+            },
+            "case_report_payload": {"damage_summary": "Rear bumper damage."},
+        },
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert response is not None
+    assert response.trigger == AITrigger.MENTION
+    assert response.metadata["direct_ai_chat"] is True
+    assert response.metadata.get("case_context_answer") is None
+    assert captured["case_id"] == "case-1"
+    assert captured["question"] == "Based on my accident, what policy coverage should I check?"
+    assert captured["case_context"] == {
+        "chat_context": {
+            "summary": "Rear-end collision at a red light.",
+            "key_facts": ["Police called: Yes"],
+        },
+        "report_payload": {"damage_summary": "Rear bumper damage."},
+    }
+
+
 async def test_handle_chat_event_non_mention_dispute_takes_precedence_over_deadline(monkeypatch) -> None:
     from ai.chat import chat_ai_service
 

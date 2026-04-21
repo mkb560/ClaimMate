@@ -43,6 +43,22 @@ INTERNAL_RESPONSE_METADATA_KEYS = {
     "case_report_payload",
 }
 
+POLICY_OR_COVERAGE_MARKERS = (
+    "policy",
+    "coverage",
+    "cover",
+    "covered",
+    "deductible",
+    "limit",
+    "limits",
+    "liability",
+    "collision",
+    "comprehensive",
+    "rental",
+    "claim rule",
+    "exclusion",
+)
+
 
 def _prefix_for_reference(text: str) -> str:
     cleaned = text.replace(DISCLAIMER_FOOTER, "").strip()
@@ -143,6 +159,56 @@ def _looks_like_case_context_question(question: str) -> bool:
     )
 
 
+def _looks_like_policy_or_coverage_question(question: str) -> bool:
+    lowered = question.lower()
+    return any(marker in lowered for marker in POLICY_OR_COVERAGE_MARKERS)
+
+
+def _rag_case_context_from_metadata(metadata: dict | None) -> dict | None:
+    if not metadata:
+        return None
+    chat_context = metadata.get("case_chat_context")
+    report_payload = metadata.get("case_report_payload")
+    if not isinstance(chat_context, dict) and not isinstance(report_payload, dict):
+        return None
+    return {
+        "chat_context": chat_context if isinstance(chat_context, dict) else None,
+        "report_payload": report_payload if isinstance(report_payload, dict) else None,
+    }
+
+
+async def _answer_policy_with_context(
+    case_id: str,
+    question: str,
+    *,
+    case_context: dict | None = None,
+):
+    if case_context:
+        return await answer_policy_question(case_id, question, case_context=case_context)
+    return await answer_policy_question(case_id, question)
+
+
+async def _answer_dispute_with_context(
+    case_id: str,
+    question: str,
+    *,
+    stage_instruction: str | None,
+    case_context: dict | None = None,
+):
+    if case_context:
+        return await answer_dispute_question(
+            case_id,
+            question,
+            stage_instruction=stage_instruction,
+            case_context=case_context,
+        )
+    return await answer_dispute_question(
+        case_id,
+        question,
+        stage_instruction=stage_instruction,
+    )
+
+
 def _as_text_list(values: object) -> list[str]:
     if not isinstance(values, list):
         return []
@@ -224,6 +290,7 @@ def _build_case_context_response(question: str, stage: ChatStage, metadata: dict
 
 
 async def _build_question_response(case_id: str, question: str, stage: ChatStage, metadata: dict | None = None) -> AIResponse:
+    case_context = _rag_case_context_from_metadata(metadata)
     if is_deadline_question(question):
         try:
             response = await explain_deadlines_for_case(case_id, stage=stage)
@@ -248,14 +315,17 @@ async def _build_question_response(case_id: str, question: str, stage: ChatStage
             stage,
             signal=signal,
             allow_policy_fallback=True,
+            case_context=case_context,
         )
 
-    if case_context_response := _build_case_context_response(question, stage, metadata):
+    if not _looks_like_policy_or_coverage_question(question) and (
+        case_context_response := _build_case_context_response(question, stage, metadata)
+    ):
         if metadata and metadata.get("direct_ai_chat") is True:
             case_context_response.metadata["direct_ai_chat"] = True
         return case_context_response
 
-    answer = await answer_policy_question(case_id, question)
+    answer = await _answer_policy_with_context(case_id, question, case_context=case_context)
     return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage, metadata=metadata)
 
 
@@ -266,15 +336,17 @@ async def _build_dispute_response(
     *,
     signal: DisputeSignal | None = None,
     allow_policy_fallback: bool = True,
+    case_context: dict | None = None,
 ) -> AIResponse | None:
     classification = await classify_dispute(question)
     if not classification.is_dispute:
         if signal is not None and signal.confidence >= 0.9:
             inferred_dispute_type = _dispute_type_from_signal(signal)
-            answer = await answer_dispute_question(
+            answer = await _answer_dispute_with_context(
                 case_id,
                 question,
                 stage_instruction=build_stage_instruction(stage),
+                case_context=case_context,
             )
             answer = _append_dispute_next_steps(
                 answer,
@@ -294,13 +366,14 @@ async def _build_dispute_response(
             )
         if not allow_policy_fallback:
             return None
-        answer = await answer_policy_question(case_id, question)
+        answer = await _answer_policy_with_context(case_id, question, case_context=case_context)
         return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage)
 
-    answer = await answer_dispute_question(
+    answer = await _answer_dispute_with_context(
         case_id,
         question,
         stage_instruction=build_stage_instruction(stage),
+        case_context=case_context,
     )
     answer = _append_dispute_next_steps(
         answer,
@@ -360,6 +433,7 @@ async def handle_chat_event(event: ChatEvent) -> AIResponse | None:
                 stage,
                 signal=signal,
                 allow_policy_fallback=False,
+                case_context=_rag_case_context_from_metadata(event.metadata),
             ):
                 return response
 

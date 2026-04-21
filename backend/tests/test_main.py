@@ -286,6 +286,7 @@ def test_ask_endpoint_returns_answer_and_citations(monkeypatch, tmp_path: Path) 
         )
 
     monkeypatch.setattr(policy_ask, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(policy_ask, "_load_saved_case_context", AsyncMock(return_value=None))
 
     now = datetime.now(UTC)
     fake_ask_case = CaseRow(
@@ -325,6 +326,53 @@ def test_ask_endpoint_returns_answer_and_citations(monkeypatch, tmp_path: Path) 
             }
         ],
     }
+
+
+def test_ask_endpoint_passes_saved_accident_context_to_rag(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import policy_ask
+
+    captured: dict[str, object] = {}
+
+    async def fake_answer_policy_question(case_id: str, question: str, **kwargs) -> AnswerResponse:
+        captured["case_id"] = case_id
+        captured["question"] = question
+        captured["case_context"] = kwargs.get("case_context")
+        return AnswerResponse(
+            answer="Based on the saved accident context, ask about collision coverage. [S1]\n\nDisclaimer: demo",
+            citations=[
+                Citation(
+                    source_type="case_context",
+                    source_label="Saved Accident Context",
+                    document_id="saved_accident_context",
+                    page_num=None,
+                    section="Saved Accident Context",
+                    excerpt="Rear-end crash near USC.",
+                )
+            ],
+            disclaimer="Disclaimer: demo",
+        )
+
+    saved_context = {
+        "chat_context": {"summary": "Rear-end crash near USC.", "key_facts": ["Police called: Yes"]},
+        "report_payload": {"damage_summary": "Rear bumper damage."},
+    }
+
+    monkeypatch.setattr(policy_ask, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(policy_ask, "_load_saved_case_context", AsyncMock(return_value=saved_context))
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/demo-case/ask",
+            json={"question": "Based on my accident, what coverage should I check?"},
+        )
+
+    assert response.status_code == 200
+    assert captured == {
+        "case_id": "demo-case",
+        "question": "Based on my accident, what coverage should I check?",
+        "case_context": saved_context,
+    }
+    assert response.json()["citations"][0]["source_type"] == "case_context"
 
 
 def test_health_endpoint_reports_ai_ready(monkeypatch, tmp_path: Path) -> None:
