@@ -359,6 +359,45 @@ async def test_answer_policy_question_builds_accident_coverage_checklist_without
     assert any(citation.source_type == "kb_a" for citation in answer.citations)
 
 
+async def test_collision_coverage_fact_question_does_not_expand_to_accident_checklist(monkeypatch) -> None:
+    async def fake_list_policy_chunks(case_id: str, limit=None):
+        return [
+            RetrievedChunk(
+                source_type="kb_a",
+                chunk_text="Coverage detail\nAuto Collision Insurance Not purchased\n",
+                document_id="policy_pdf",
+                page_num=2,
+                section="COVERAGE DETAIL",
+                metadata={"source_label": "Your Policy (policy.pdf)"},
+            )
+        ]
+
+    async def fail_embed_query(question: str) -> list[float]:
+        raise AssertionError("Collision fact questions should be answered from structured policy facts.")
+
+    async def fail_generate_answer(**kwargs):
+        raise AssertionError("Collision fact questions should not need LLM generation.")
+
+    monkeypatch.setattr(query_engine, "list_policy_chunks", fake_list_policy_chunks)
+    monkeypatch.setattr(query_engine, "_embed_query", fail_embed_query)
+    monkeypatch.setattr(query_engine, "_generate_answer", fail_generate_answer)
+
+    answer = await answer_policy_question(
+        "demo-case",
+        "Do I have collision coverage?",
+        case_context={
+            "chat_context": {
+                "summary": "Rear-end collision at a red light.",
+                "key_facts": ["Location: 1200 S Figueroa St"],
+            }
+        },
+    )
+
+    assert "Not purchased" in answer.answer
+    assert "Based on the saved accident context" not in answer.answer
+    assert answer.citations[0].source_type == "kb_a"
+
+
 async def test_accident_coverage_checklist_keeps_case_context_concise(monkeypatch) -> None:
     async def fake_list_policy_chunks(case_id: str, limit=None):
         return [

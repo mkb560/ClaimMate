@@ -31,7 +31,15 @@ from models.ai_types import AnswerResponse, ChatStage, Citation
 
 SUMMARY_WORDS = ("summarize", "summary", "overview", "bullet", "key point", "key points")
 POLICY_SUMMARY_SUBJECTS = ("policy", "coverage", "coverages", "insurance", "document")
-ACCIDENT_CONTEXT_WORDS = ("accident", "crash", "collision", "incident", "damage", "rear-end", "rear ended")
+ACCIDENT_CONTEXT_WORDS = (
+    "accident",
+    "crash",
+    "incident",
+    "my damage",
+    "the damage",
+    "rear-end",
+    "rear ended",
+)
 COVERAGE_CHECK_WORDS = ("coverage", "cover", "covered", "check", "look at", "look for", "policy")
 NUMBER_WORDS = {
     "one": 1,

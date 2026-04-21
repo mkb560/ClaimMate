@@ -108,6 +108,11 @@ def _append_dispute_next_steps(
 ) -> AnswerResponse:
     steps = DISPUTE_NEXT_STEPS.get(dispute_type, DISPUTE_NEXT_STEPS["OTHER"])
     base_answer = _strip_disclaimer(answer.answer)
+    if NOT_ENOUGH_INFO_MESSAGE.lower() in base_answer.lower():
+        base_answer = (
+            "I don't have enough specific claim-handling details yet to assess the dispute confidently, "
+            "but you can still use this next-step checklist to organize the conversation."
+        )
     helper = (
         f"{_dispute_helper_intro(stage)}\n"
         f"- What happened: {steps['happened']}\n"

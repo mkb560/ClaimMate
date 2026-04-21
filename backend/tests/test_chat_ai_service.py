@@ -565,7 +565,8 @@ async def test_handle_chat_event_hard_dispute_signal_stays_on_dispute_path_when_
     assert response is not None
     assert response.trigger == AITrigger.DISPUTE
     assert response.text.startswith("For reference:")
-    assert "don't have enough information" in response.text
+    assert "next-step checklist" in response.text
+    assert "uploaded policy and regulatory materials" not in response.text
     assert "A few practical next steps to keep the discussion organized:" in response.text
     assert response.metadata["dispute_type"] == "DENIAL"
     assert response.metadata["recommended_statute"] == "10 CCR §2695.7(b)"
