@@ -160,6 +160,7 @@ async def test_handle_chat_event_uses_saved_case_context_for_accident_questions(
     from ai.chat import chat_ai_service
 
     policy_called = False
+    open_chat_called = False
 
     async def fake_answer_policy_question(case_id: str, question: str):
         nonlocal policy_called
@@ -170,7 +171,20 @@ async def test_handle_chat_event_uses_saved_case_context_for_accident_questions(
             disclaimer=DISCLAIMER_FOOTER,
         )
 
+    async def fake_open_chat_question(question: str, stage: ChatStage, metadata=None):
+        nonlocal open_chat_called
+        open_chat_called = True
+        assert question == "What happened in the accident?"
+        assert metadata["case_chat_context"]["summary"].startswith("Rear-end collision")
+        return AIResponse(
+            text=f"Rear-end collision at a red light. Both drivers exchanged insurance information.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            trigger=AITrigger.MENTION,
+            metadata={"stage": stage.value, "open_chat_answer": True, "direct_ai_chat": True},
+        )
+
     monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "_answer_open_chat_question", fake_open_chat_question)
     monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
 
     event = ChatEvent(
@@ -193,20 +207,30 @@ async def test_handle_chat_event_uses_saved_case_context_for_accident_questions(
     response = await chat_ai_service.handle_chat_event(event)
     assert response is not None
     assert response.trigger == AITrigger.MENTION
-    assert response.metadata["case_context_answer"] is True
+    assert response.metadata["open_chat_answer"] is True
     assert response.metadata["direct_ai_chat"] is True
-    assert "case_chat_context" not in response.metadata
     assert "Rear-end collision" in response.text
     assert policy_called is False
+    assert open_chat_called is True
 
 
-async def test_handle_chat_event_does_not_treat_general_where_question_as_case_context(monkeypatch) -> None:
+async def test_handle_chat_event_allows_general_where_question_to_use_open_llm(monkeypatch) -> None:
     from ai.chat import chat_ai_service
 
     async def fail_answer_policy_question(case_id: str, question: str, **kwargs):
-        raise AssertionError("General trivia should not fall through into policy RAG.")
+        raise AssertionError("General trivia with saved context should go to the open chat answer.")
+
+    async def fake_open_chat_question(question: str, stage: ChatStage, metadata=None):
+        assert question == "where is the capital city in the US"
+        return AIResponse(
+            text=f"The capital city of the United States is Washington, D.C.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            trigger=AITrigger.MENTION,
+            metadata={"stage": stage.value, "open_chat_answer": True},
+        )
 
     monkeypatch.setattr(chat_ai_service, "answer_policy_question", fail_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "_answer_open_chat_question", fake_open_chat_question)
     monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
 
     event = ChatEvent(
@@ -227,18 +251,75 @@ async def test_handle_chat_event_does_not_treat_general_where_question_as_case_c
     response = await chat_ai_service.handle_chat_event(event)
     assert response is not None
     assert response.trigger == AITrigger.MENTION
-    assert response.metadata["out_of_scope"] is True
-    assert "insurance claim" in response.text
+    assert response.metadata["open_chat_answer"] is True
+    assert "Washington, D.C." in response.text
     assert "Rear-end collision" not in response.text
+
+
+async def test_handle_chat_event_uses_open_llm_when_rag_has_no_answer(monkeypatch) -> None:
+    from ai.chat import chat_ai_service
+
+    rag_called = False
+
+    async def fake_answer_policy_question(case_id: str, question: str):
+        nonlocal rag_called
+        rag_called = True
+        return AnswerResponse(
+            answer=(
+                "I don't have enough information in the uploaded policy and regulatory materials "
+                f"to answer that confidently.\n\n{DISCLAIMER_FOOTER}"
+            ),
+            citations=[],
+            disclaimer=DISCLAIMER_FOOTER,
+        )
+
+    async def fake_open_chat_question(question: str, stage: ChatStage, metadata=None):
+        assert question == "where is the capital city in the US"
+        return AIResponse(
+            text=f"The capital city of the United States is Washington, D.C.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            trigger=AITrigger.MENTION,
+            metadata={"stage": stage.value, "open_chat_answer": True},
+        )
+
+    monkeypatch.setattr(chat_ai_service, "answer_policy_question", fake_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "_answer_open_chat_question", fake_open_chat_question)
+    monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
+
+    event = ChatEvent(
+        case_id="case-1",
+        sender_role="owner",
+        message_text="@ai where is the capital city in the US",
+        participants=[Participant(user_id="1", role="owner")],
+        invite_sent=False,
+        trigger=ChatEventTrigger.MESSAGE,
+    )
+
+    response = await chat_ai_service.handle_chat_event(event)
+    assert rag_called is True
+    assert response is not None
+    assert response.metadata["open_chat_answer"] is True
+    assert "Washington, D.C." in response.text
 
 
 async def test_handle_chat_event_still_answers_where_accident_happened(monkeypatch) -> None:
     from ai.chat import chat_ai_service
 
     async def fail_answer_policy_question(case_id: str, question: str, **kwargs):
-        raise AssertionError("Accident location questions should use saved case context first.")
+        raise AssertionError("Accident location questions should go to the open chat answer with saved context.")
+
+    async def fake_open_chat_question(question: str, stage: ChatStage, metadata=None):
+        assert question == "where did the accident happen?"
+        assert metadata["case_chat_context"]["key_facts"] == ["Location: 3201 S Hoover St"]
+        return AIResponse(
+            text=f"The saved accident location is 3201 S Hoover St.\n\n{DISCLAIMER_FOOTER}",
+            citations=[],
+            trigger=AITrigger.MENTION,
+            metadata={"stage": stage.value, "open_chat_answer": True},
+        )
 
     monkeypatch.setattr(chat_ai_service, "answer_policy_question", fail_answer_policy_question)
+    monkeypatch.setattr(chat_ai_service, "_answer_open_chat_question", fake_open_chat_question)
     monkeypatch.setattr(chat_ai_service, "maybe_get_deadline_alert", AsyncMock(return_value=None))
 
     event = ChatEvent(
@@ -258,7 +339,7 @@ async def test_handle_chat_event_still_answers_where_accident_happened(monkeypat
 
     response = await chat_ai_service.handle_chat_event(event)
     assert response is not None
-    assert response.metadata["case_context_answer"] is True
+    assert response.metadata["open_chat_answer"] is True
     assert "3201 S Hoover St" in response.text
 
 

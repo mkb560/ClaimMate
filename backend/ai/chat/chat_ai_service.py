@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from ai.clients import get_openai_client
 from ai.chat.mention_handler import contains_ai_mention, extract_ai_question
 from ai.chat.stage_prompts import build_stage_instruction
 from ai.chat.stage_router import determine_stage
+from ai.config import ai_config
 from ai.deadline.deadline_checker import (
     explain_deadlines_for_case,
     is_deadline_question,
@@ -11,6 +13,7 @@ from ai.deadline.deadline_checker import (
 from ai.dispute.keyword_filter import DisputeSignal, detect_dispute_signal
 from ai.dispute.semantic_detector import STATUTE_BY_DISPUTE_TYPE, classify_dispute
 from ai.rag.prompt_templates import DISCLAIMER_FOOTER
+from ai.rag.prompt_templates import NOT_ENOUGH_INFO_MESSAGE
 from ai.rag.query_engine import answer_dispute_question, answer_policy_question, summarize_policy_highlights
 from models.ai_types import AIResponse, AITrigger, AnswerResponse, ChatEvent, ChatEventTrigger, ChatStage
 
@@ -59,48 +62,18 @@ POLICY_OR_COVERAGE_MARKERS = (
     "exclusion",
 )
 
-CASE_CONTEXT_MARKERS = (
-    "accident",
-    "incident",
-    "crash",
-    "collision",
-    "case",
-    "claim",
-    "what happened",
-    "scene",
-    "location",
-    "damage",
-    "police",
-    "injur",
-    "photo",
-    "missing",
-    "follow up",
-    "follow-up",
-    "next step",
-    "driver",
-    "party",
-    "vehicle",
-    "report",
-    "tow",
-    "repair",
-    "witness",
-)
+OPEN_CHAT_SYSTEM_PROMPT = """You are ClaimMate, a friendly AI copilot for car insurance claims.
 
-GENERAL_KNOWLEDGE_MARKERS = (
-    "capital city",
-    "capital of",
-    "weather",
-    "recipe",
-    "write code",
-    "python",
-    "javascript",
-    "stock price",
-    "sports",
-    "movie",
-    "song",
-    "translate",
-    "history of",
-)
+You should feel conversational and helpful, not like a rigid keyword router.
+
+Rules:
+1. If the user asks a normal general-knowledge question, answer it briefly and directly.
+2. If the user asks about the saved accident/case, use the saved case context when it is relevant.
+3. If the user asks about policy language, coverage, legal rights, deadlines, or disputes, be careful and avoid making coverage guarantees.
+4. Do not invent case facts or policy facts that are not in the provided context.
+5. Keep the answer concise, usually 1 to 4 short sentences.
+6. If the question is unrelated to insurance, answer it, then gently offer to help with the claim if useful.
+"""
 
 
 def _prefix_for_reference(text: str) -> str:
@@ -173,45 +146,9 @@ def _to_ai_response(answer, *, trigger: AITrigger, stage: ChatStage, metadata: d
     )
 
 
-def _looks_like_case_context_question(question: str) -> bool:
-    lowered = question.lower()
-    if any(marker in lowered for marker in CASE_CONTEXT_MARKERS):
-        return True
-    if "summary" in lowered:
-        return any(marker in lowered for marker in ("accident", "case", "claim", "incident", "report"))
-    if any(marker in lowered for marker in ("where", "when", "time")):
-        return any(marker in lowered for marker in ("happen", "occur", "accident", "incident", "crash", "collision"))
-    return False
-
-
 def _looks_like_policy_or_coverage_question(question: str) -> bool:
     lowered = question.lower()
     return any(marker in lowered for marker in POLICY_OR_COVERAGE_MARKERS)
-
-
-def _looks_like_out_of_scope_question(question: str) -> bool:
-    lowered = question.lower()
-    if _looks_like_policy_or_coverage_question(question) or _looks_like_case_context_question(question):
-        return False
-    return any(marker in lowered for marker in GENERAL_KNOWLEDGE_MARKERS)
-
-
-def _build_out_of_scope_response(stage: ChatStage, metadata: dict | None = None) -> AIResponse:
-    text = (
-        "I’m ClaimMate, so I should stay focused on this insurance claim rather than general trivia. "
-        "I can help with your policy, accident details, claim deadlines, dispute next steps, or documents to collect."
-        f"\n\n{DISCLAIMER_FOOTER}"
-    )
-    if stage == ChatStage.STAGE_3 and not text.startswith("For reference:"):
-        text = _prefix_for_reference(text)
-    response_metadata = {"stage": stage.value, "out_of_scope": True}
-    response_metadata.update(_public_response_metadata(metadata))
-    return AIResponse(
-        text=text,
-        citations=[],
-        trigger=AITrigger.MENTION,
-        metadata=response_metadata,
-    )
 
 
 def _rag_case_context_from_metadata(metadata: dict | None) -> dict | None:
@@ -259,6 +196,10 @@ async def _answer_dispute_with_context(
     )
 
 
+def _is_not_enough_answer(answer: AnswerResponse) -> bool:
+    return NOT_ENOUGH_INFO_MESSAGE.lower() in answer.answer.lower()
+
+
 def _as_text_list(values: object) -> list[str]:
     if not isinstance(values, list):
         return []
@@ -269,95 +210,75 @@ def _format_bullets(items: list[str]) -> str:
     return "\n".join(f"- {item}" for item in items)
 
 
-def _fact_value_from_key_facts(key_facts: list[str], label: str) -> str | None:
-    prefix = f"{label}:"
-    for item in key_facts:
-        if item.lower().startswith(prefix.lower()):
-            return item.split(":", 1)[1].strip()
-    return None
-
-
-def _build_case_context_response(question: str, stage: ChatStage, metadata: dict | None) -> AIResponse | None:
-    if not metadata or not _looks_like_case_context_question(question):
-        return None
-
+def _build_open_chat_context(metadata: dict | None) -> str:
+    if not metadata:
+        return "No saved case context is available."
     chat_context = metadata.get("case_chat_context")
     report_payload = metadata.get("case_report_payload")
-    if not isinstance(chat_context, dict) and not isinstance(report_payload, dict):
-        return None
-
-    lowered = question.lower()
     lines: list[str] = []
-    response_kind = "summary"
 
-    summary = ""
     if isinstance(chat_context, dict):
-        summary = str(chat_context.get("summary") or "").strip()
-    if not summary and isinstance(report_payload, dict):
-        summary = str(report_payload.get("accident_summary") or "").strip()
-
-    key_facts = _as_text_list(chat_context.get("key_facts") if isinstance(chat_context, dict) else [])
-    follow_up_items = _as_text_list(chat_context.get("follow_up_items") if isinstance(chat_context, dict) else [])
-
-    if any(marker in lowered for marker in ("missing", "follow up", "follow-up", "next step")):
-        response_kind = "follow_up"
-        if follow_up_items:
-            lines.append("Based on the saved accident context, the current follow-up items are:")
-            lines.append(_format_bullets(follow_up_items))
-        else:
-            lines.append("Based on the saved accident context, I do not see open follow-up items right now.")
-    elif any(marker in lowered for marker in ("where", "location")):
-        response_kind = "location"
-        location = _fact_value_from_key_facts(key_facts, "Location")
-        if not location and isinstance(report_payload, dict):
-            location = str(report_payload.get("location_summary") or "").strip()
-        if location:
-            lines.append(f"The saved accident location is {location}.")
-    elif "damage" in lowered and isinstance(report_payload, dict):
-        response_kind = "damage"
-        damage = str(report_payload.get("damage_summary") or "").strip()
-        narrative = str(report_payload.get("detailed_narrative") or "").strip()
-        if damage:
-            lines.append(f"Damage summary: {damage}")
-        if narrative:
-            lines.append(f"Relevant narrative: {narrative}")
-    elif any(marker in lowered for marker in ("when", "time")):
-        response_kind = "time"
-        accident_time = _fact_value_from_key_facts(key_facts, "Accident time")
-        if not accident_time and isinstance(report_payload, dict):
-            accident_time = str(report_payload.get("occurrence_time") or "").strip()
-        if accident_time:
-            lines.append(f"The saved accident time is {accident_time}.")
-    elif any(marker in lowered for marker in ("driver", "party", "vehicle")):
-        response_kind = "parties"
-        rows = report_payload.get("party_comparison_rows") if isinstance(report_payload, dict) else None
-        if isinstance(rows, list) and rows:
-            lines.append("The saved party comparison shows:")
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                label = row.get("field_label")
-                owner = row.get("owner_value")
-                other = row.get("other_party_value")
-                lines.append(f"- {label}: owner = {owner}; other party = {other}")
-    else:
-        if summary:
+        if summary := str(chat_context.get("summary") or "").strip():
             lines.append(f"Case summary: {summary}")
+        key_facts = _as_text_list(chat_context.get("key_facts"))
         if key_facts:
             lines.append("Key saved facts:")
             lines.append(_format_bullets(key_facts))
+        follow_up_items = _as_text_list(chat_context.get("follow_up_items"))
+        if follow_up_items:
+            lines.append("Open follow-up items:")
+            lines.append(_format_bullets(follow_up_items))
 
-    if not lines:
-        return None
+    if isinstance(report_payload, dict):
+        for label, key in (
+            ("Accident summary", "accident_summary"),
+            ("Location", "location_summary"),
+            ("Damage summary", "damage_summary"),
+            ("Detailed narrative", "detailed_narrative"),
+            ("Police report number", "police_report_number"),
+            ("Repair shop", "repair_shop_name"),
+            ("Adjuster", "adjuster_name"),
+        ):
+            if value := str(report_payload.get(key) or "").strip():
+                lines.append(f"{label}: {value}")
 
-    text = "\n".join(lines).strip() + f"\n\n{DISCLAIMER_FOOTER}"
+    return "\n".join(lines)[:5000] if lines else "No saved case context is available."
+
+
+async def _answer_open_chat_question(
+    question: str,
+    stage: ChatStage,
+    metadata: dict | None = None,
+) -> AIResponse:
+    client = get_openai_client()
+    response = await client.chat.completions.create(
+        model=ai_config.rag_model,
+        reasoning_effort=ai_config.rag_reasoning_effort,
+        messages=[
+            {"role": "system", "content": OPEN_CHAT_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"<saved_case_context>\n{_build_open_chat_context(metadata)}\n</saved_case_context>\n\n"
+                    f"Question: {question}"
+                ),
+            },
+        ],
+        max_completion_tokens=700,
+    )
+    raw_text = (response.choices[0].message.content or "").strip()
+    text = raw_text or "I’m not sure how to answer that yet, but I can still help with the claim details."
+    if DISCLAIMER_FOOTER not in text:
+        text = f"{text}\n\n{DISCLAIMER_FOOTER}"
     if stage == ChatStage.STAGE_3 and not text.startswith("For reference:"):
         text = _prefix_for_reference(text)
+    response_metadata = {"stage": stage.value, "open_chat_answer": True}
+    response_metadata.update(_public_response_metadata(metadata))
     return AIResponse(
         text=text,
         citations=[],
         trigger=AITrigger.MENTION,
-        metadata={"stage": stage.value, "case_context_answer": True, "case_context_kind": response_kind},
+        metadata=response_metadata,
     )
 
 
@@ -390,17 +311,12 @@ async def _build_question_response(case_id: str, question: str, stage: ChatStage
             case_context=case_context,
         )
 
-    if not _looks_like_policy_or_coverage_question(question) and (
-        case_context_response := _build_case_context_response(question, stage, metadata)
-    ):
-        if metadata and metadata.get("direct_ai_chat") is True:
-            case_context_response.metadata["direct_ai_chat"] = True
-        return case_context_response
-
-    if _looks_like_out_of_scope_question(question):
-        return _build_out_of_scope_response(stage, metadata)
+    if case_context and not _looks_like_policy_or_coverage_question(question):
+        return await _answer_open_chat_question(question, stage, metadata)
 
     answer = await _answer_policy_with_context(case_id, question, case_context=case_context)
+    if _is_not_enough_answer(answer):
+        return await _answer_open_chat_question(question, stage, metadata)
     return _to_ai_response(answer, trigger=AITrigger.MENTION, stage=stage, metadata=metadata)
 
 
