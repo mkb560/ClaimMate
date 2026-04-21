@@ -31,6 +31,8 @@ from models.ai_types import AnswerResponse, ChatStage, Citation
 
 SUMMARY_WORDS = ("summarize", "summary", "overview", "bullet", "key point", "key points")
 POLICY_SUMMARY_SUBJECTS = ("policy", "coverage", "coverages", "insurance", "document")
+ACCIDENT_CONTEXT_WORDS = ("accident", "crash", "collision", "incident", "damage", "rear-end", "rear ended")
+COVERAGE_CHECK_WORDS = ("coverage", "cover", "covered", "check", "look at", "look for", "policy")
 NUMBER_WORDS = {
     "one": 1,
     "two": 2,
@@ -72,6 +74,13 @@ def is_policy_summary_question(question: str) -> bool:
     )
 
 
+def is_accident_coverage_check_question(question: str) -> bool:
+    lowered = question.lower()
+    return any(word in lowered for word in ACCIDENT_CONTEXT_WORDS) and any(
+        word in lowered for word in COVERAGE_CHECK_WORDS
+    )
+
+
 def _requested_bullet_count(question: str, *, default: int = 3) -> int:
     lowered = question.lower()
     if match := re.search(r"\b([1-5])\b", lowered):
@@ -95,6 +104,17 @@ def _fact_citation(fact: PolicyFact) -> Citation:
         page_num=fact.page_num,
         section=normalize_citation_section(fact.section),
         excerpt=fact.excerpt,
+    )
+
+
+def _chunk_citation(chunk: RetrievedChunk) -> Citation:
+    return Citation(
+        source_type=chunk.source_type,
+        source_label=source_label_for_chunk(chunk),
+        document_id=chunk.document_id or ("policy_pdf" if chunk.source_type == "kb_a" else "unknown"),
+        page_num=chunk.page_num,
+        section=normalize_citation_section(chunk.section),
+        excerpt=chunk.chunk_text[:160].strip(),
     )
 
 
@@ -204,6 +224,81 @@ def _build_summary_answer(question: str, chunks: Sequence[RetrievedChunk]) -> An
 
     answer = "Here are the main policy points I can summarize from the indexed document:\n" + "\n".join(
         f"- {bullet}" for bullet in selected
+    )
+    return AnswerResponse(answer=answer, citations=citations, disclaimer="")
+
+
+def _short_case_summary(context_chunk: RetrievedChunk) -> str:
+    for line in context_chunk.chunk_text.splitlines():
+        if line.startswith("Accident summary:"):
+            return line.removeprefix("Accident summary:").strip()
+    return context_chunk.chunk_text.splitlines()[0].strip()
+
+
+def _build_accident_coverage_answer(
+    question: str,
+    chunks: Sequence[RetrievedChunk],
+    case_context: dict[str, Any] | None,
+    *,
+    case_id: str,
+) -> AnswerResponse | None:
+    if not is_accident_coverage_check_question(question):
+        return None
+    context_chunk = _case_context_chunk(case_id, case_context)
+    if context_chunk is None or not chunks:
+        return None
+
+    facts = extract_policy_facts(chunks)
+    citations: list[Citation] = []
+    ref_keys: dict[tuple[str, str, int | None, str | None], str] = {}
+
+    def ref_for_context() -> str:
+        key = ("case_context", context_chunk.document_id or "", context_chunk.page_num, context_chunk.section)
+        if key not in ref_keys:
+            ref_keys[key] = f"S{len(citations) + 1}"
+            citations.append(_chunk_citation(context_chunk))
+        return ref_keys[key]
+
+    def ref_for_fact(fact: PolicyFact) -> str:
+        key = (fact.key, fact.value, fact.page_num, fact.section)
+        if key not in ref_keys:
+            ref_keys[key] = f"S{len(citations) + 1}"
+            citations.append(_fact_citation(fact))
+        return ref_keys[key]
+
+    lines = [
+        f"- Accident context: {_short_case_summary(context_chunk)} [{ref_for_context()}]"
+    ]
+
+    collision = _first_fact(facts, "collision_coverage")
+    liability = _first_fact(facts, "liability_limits")
+    rental = _first_fact(facts, "rental_reimbursement")
+    comprehensive = _first_fact(facts, "comprehensive_coverage")
+
+    if collision:
+        lines.append(
+            f"- First check collision coverage for damage to your own vehicle; this policy lists Auto Collision Insurance as {collision.value}. [{ref_for_fact(collision)}]"
+        )
+    if liability:
+        lines.append(
+            f"- Also review liability/property-damage limits because the accident involves another driver; the listed liability limits are {liability.value}. [{ref_for_fact(liability)}]"
+        )
+    if rental:
+        lines.append(
+            f"- If repairs leave you without a car, check rental reimbursement; the policy lists Rental Reimbursement as {rental.value}. [{ref_for_fact(rental)}]"
+        )
+    if comprehensive:
+        lines.append(
+            f"- Comprehensive coverage is usually separate from collision-type damage; this policy lists Auto Comprehensive Insurance as {comprehensive.value}. [{ref_for_fact(comprehensive)}]"
+        )
+
+    if len(lines) == 1:
+        return None
+
+    answer = (
+        "Based on the saved accident context and the indexed policy, here are the coverage areas to check:\n"
+        + "\n".join(lines)
+        + "\nThis is a checklist, not a coverage guarantee; the insurer still has to apply the full policy terms to the claim."
     )
     return AnswerResponse(answer=answer, citations=citations, disclaimer="")
 
@@ -393,6 +488,18 @@ async def answer_policy_question(
     client: AsyncOpenAI | None = None,
     case_context: dict[str, Any] | None = None,
 ) -> AnswerResponse:
+    if case_context and is_accident_coverage_check_question(question):
+        all_policy_chunks = await list_policy_chunks(case_id, limit=None)
+        if coverage_answer := _build_accident_coverage_answer(
+            question,
+            all_policy_chunks,
+            case_context,
+            case_id=case_id,
+        ):
+            coverage_answer.answer = _normalize_answer(coverage_answer.answer)
+            coverage_answer.disclaimer = DISCLAIMER_FOOTER
+            return coverage_answer
+
     if is_policy_summary_question(question):
         all_policy_chunks = await list_policy_chunks(case_id, limit=None)
         if summary_answer := _build_summary_answer(question, all_policy_chunks):

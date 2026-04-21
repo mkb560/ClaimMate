@@ -304,6 +304,56 @@ async def test_answer_policy_question_injects_saved_case_context_as_citable_sour
     assert answer.citations[0].source_label == "Saved Accident Context"
 
 
+async def test_answer_policy_question_builds_accident_coverage_checklist_without_llm(monkeypatch) -> None:
+    async def fake_list_policy_chunks(case_id: str, limit=None):
+        return [
+            RetrievedChunk(
+                source_type="kb_a",
+                chunk_text=(
+                    "Coverage detail for 2024 Hyundai Elantra\n"
+                    "Automobile Liability Insurance\n"
+                    "Bodily Injury $50,000 each person\n$100,000 each occurrence\n"
+                    "Property Damage $50,000 each occurrence\n"
+                    "Auto Collision Insurance $500 deductible\n"
+                    "Auto Comprehensive Insurance Not purchased\n"
+                    "Rental Reimbursement Not purchased*"
+                ),
+                document_id="policy_pdf",
+                page_num=2,
+                section="COVERAGE DETAIL",
+                metadata={"source_label": "Your Policy (policy.pdf)"},
+            )
+        ]
+
+    async def fail_embed_query(question: str) -> list[float]:
+        raise AssertionError("Accident coverage checklist should not require semantic search.")
+
+    async def fail_generate_answer(**kwargs):
+        raise AssertionError("Accident coverage checklist should be answered deterministically.")
+
+    monkeypatch.setattr(query_engine, "list_policy_chunks", fake_list_policy_chunks)
+    monkeypatch.setattr(query_engine, "_embed_query", fail_embed_query)
+    monkeypatch.setattr(query_engine, "_generate_answer", fail_generate_answer)
+
+    answer = await answer_policy_question(
+        "demo-case",
+        "Based on my accident, what policy coverage should I check?",
+        case_context={
+            "chat_context": {
+                "summary": "Rear-end crash near USC.",
+                "key_facts": ["Location: 1200 S Figueroa St"],
+            }
+        },
+    )
+
+    assert "Based on the saved accident context" in answer.answer
+    assert "Rear-end crash near USC" in answer.answer
+    assert "collision coverage" in answer.answer.lower()
+    assert "Rental Reimbursement" in answer.answer
+    assert answer.citations[0].source_type == "case_context"
+    assert any(citation.source_type == "kb_a" for citation in answer.citations)
+
+
 async def test_generate_answer_uses_rescue_when_initial_answer_has_no_citations() -> None:
     responses = iter(
         [
