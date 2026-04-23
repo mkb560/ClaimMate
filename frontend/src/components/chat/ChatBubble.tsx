@@ -2,6 +2,14 @@
 
 import { useState } from 'react'
 
+const DISCLAIMER_PREFIX = 'Disclaimer:'
+
+function splitDisclaimer(text: string): { main: string; disclaimer: string } {
+  const idx = text.indexOf(DISCLAIMER_PREFIX)
+  if (idx === -1) return { main: text, disclaimer: '' }
+  return { main: text.slice(0, idx).trim(), disclaimer: text.slice(idx).trim() }
+}
+
 type CitationItem = {
   source_label: string
   source_type: string
@@ -32,6 +40,9 @@ export function ChatBubble({ message }: { message: DisplayMessage }) {
 
   const isUser = message.role === 'user'
   const citations = (message.citations ?? []) as CitationItem[]
+  const { main: mainText, disclaimer: disclaimerText } = isUser
+    ? { main: message.text, disclaimer: '' }
+    : splitDisclaimer(message.text)
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -42,7 +53,10 @@ export function ChatBubble({ message }: { message: DisplayMessage }) {
             : 'bg-slate-100 text-slate-900'
         }`}
       >
-        <p className="whitespace-pre-wrap">{message.text}</p>
+        <p className="whitespace-pre-wrap">{mainText}</p>
+        {disclaimerText && (
+          <p className="mt-2 text-xs text-slate-400 whitespace-pre-wrap">{disclaimerText}</p>
+        )}
         {!isUser && citations.length > 0 && (
           <div className="mt-2 border-t border-slate-200 pt-2">
             <button

@@ -44,6 +44,7 @@ export default function ChatPage() {
   const caseId = params.id
   const router = useRouter()
   const [history, setHistory] = useState<DisplayMessage[]>([])
+  const [isAiTyping, setIsAiTyping] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
@@ -53,6 +54,18 @@ export default function ChatPage() {
     caseId,
     token
   )
+
+  useEffect(() => {
+    const last = wsMessages[wsMessages.length - 1]
+    if (last && (last.type === 'ai_message' || last.type === 'system')) {
+      setIsAiTyping(false)
+    }
+  }, [wsMessages])
+
+  function handleSend(text: string) {
+    sendMessage(text)
+    setIsAiTyping(true)
+  }
 
   async function handleCreateInvite() {
     setInviteLoading(true)
@@ -150,9 +163,9 @@ export default function ChatPage() {
         </div>
       )}
       <Card className="flex flex-1 flex-col overflow-hidden p-0">
-        <ChatWindow messages={allMessages} />
+        <ChatWindow messages={allMessages} isAiTyping={isAiTyping} />
         <div className="border-t border-slate-200 p-4">
-          <ChatInput onSend={sendMessage} disabled={status !== 'open'} />
+          <ChatInput onSend={handleSend} disabled={status !== 'open'} />
         </div>
       </Card>
     </div>

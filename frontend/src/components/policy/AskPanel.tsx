@@ -58,7 +58,9 @@ export function AskPanel({ caseId }: { caseId: string }) {
         </Button>
         {answer && (
           <div className="mt-4 space-y-3">
-            <p className="text-sm text-slate-900">{answer}</p>
+            <p className="text-sm text-slate-900">
+              {disclaimer ? answer.replace(disclaimer, '').trim() : answer}
+            </p>
             {disclaimer && (
               <p className="text-xs text-slate-500">{disclaimer}</p>
             )}
