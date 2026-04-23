@@ -452,6 +452,26 @@ export async function sendChatMessage(
   return (await response.json()) as PostChatMessageResponse;
 }
 
+export type UserCaseEntry = {
+  case_id: string
+  role: string
+  created_at: string
+}
+
+export async function getUserCases(): Promise<UserCaseEntry[]> {
+  const response = await fetch(`${API_BASE_URL}/cases`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { ...getAuthHeaders() },
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || 'Failed to load cases')
+  }
+  const data = await response.json() as { cases: UserCaseEntry[] }
+  return data.cases
+}
+
 export async function createCase(caseId?: string) {
   const response = await fetch(`${API_BASE_URL}/cases`, {
     method: "POST",

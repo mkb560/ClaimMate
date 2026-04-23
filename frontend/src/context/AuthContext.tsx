@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const mockToken = 'mock-token'
       setToken(mockToken)
       setTokenState(mockToken)
-      setUser({ id: 'mock-user', email, display_name: 'Dev User' })
+      setUser({ id: `mock-${email}`, email, display_name: 'Dev User' })
       return
     }
     const data = await loginUser(email, password)
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const mockToken = 'mock-token'
       setToken(mockToken)
       setTokenState(mockToken)
-      setUser({ id: 'mock-user', email, display_name: displayName ?? 'Dev User' })
+      setUser({ id: `mock-${email}`, email, display_name: displayName ?? 'Dev User' })
       return
     }
     const data = await registerUser(email, password, displayName)

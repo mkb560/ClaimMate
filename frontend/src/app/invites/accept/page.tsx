@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { lookupInvite, acceptInvite, InviteLookupResponse } from '@/lib/api'
-import { addCaseId } from '@/lib/auth'
+import { setCaseName } from '@/lib/auth'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -38,7 +38,7 @@ function AcceptInviteContent() {
     setAcceptError('')
     try {
       const res = await acceptInvite(token)
-      addCaseId(res.case_id)
+      setCaseName(res.case_id, res.case_id)
       router.push(`/cases/${res.case_id}/chat`)
     } catch (err) {
       setAcceptError(err instanceof Error ? err.message : 'Failed to accept invite.')
