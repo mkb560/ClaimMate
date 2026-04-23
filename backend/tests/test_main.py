@@ -490,6 +490,82 @@ def test_seed_accident_demo_endpoint_returns_seeded_payload(monkeypatch, tmp_pat
     assert response.json()["sample_chat_responses"]["claim_rule_stage_3"]["trigger"] == "MENTION"
 
 
+def test_upload_incident_photo_appends_stage_a_attachment(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
+    monkeypatch.setattr(
+        cases_and_accident,
+        "save_incident_photo",
+        AsyncMock(return_value=("photo-123", "demo-case/photo-123-overview.jpg")),
+    )
+    monkeypatch.setattr(
+        cases_and_accident.case_service,
+        "append_stage_a_photo_attachment",
+        AsyncMock(return_value={"photo_attachments": [{"photo_id": "photo-123"}]}),
+    )
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/demo-case/incident-photos",
+            data={"category": "overview", "caption": "rear bumper damage"},
+            files={"file": ("rear.jpg", b"fake-jpeg", "image/jpeg")},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["case_id"] == "demo-case"
+    assert body["photo_attachment"]["photo_id"] == "photo-123"
+    assert body["photo_attachment"]["storage_key"] == "demo-case/photo-123-overview.jpg"
+    assert body["photo_attachment"]["category"] == "overview"
+    assert body["photo_attachment"]["caption"] == "rear bumper damage"
+
+
+def test_upload_incident_photo_rejects_invalid_category(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={},
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
+    save_mock = AsyncMock(return_value=("photo-123", "demo-case/photo-123-overview.jpg"))
+    monkeypatch.setattr(cases_and_accident, "save_incident_photo", save_mock)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.post(
+            "/cases/demo-case/incident-photos",
+            data={"category": "invalid-category"},
+            files={"file": ("rear.jpg", b"fake-jpeg", "image/jpeg")},
+        )
+
+    assert response.status_code == 400
+    assert "Invalid category" in response.json()["detail"]
+    save_mock.assert_not_awaited()
+
+
 def test_chat_event_persists_user_and_ai_when_model_responds(monkeypatch, tmp_path: Path) -> None:
     from app.routers import cases_and_accident
 

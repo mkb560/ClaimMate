@@ -119,6 +119,25 @@ async def patch_stage_b(case_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+async def append_stage_a_photo_attachment(case_id: str, attachment: dict[str, Any]) -> dict[str, Any]:
+    sessionmaker = get_sessionmaker()
+    now = _utcnow()
+    async with sessionmaker() as session:
+        row = await _require_case(session, case_id)
+        stage_a = dict(row.stage_a_json or {})
+        existing = stage_a.get("photo_attachments")
+        if isinstance(existing, list):
+            attachments = [item for item in existing if isinstance(item, dict)]
+        else:
+            attachments = []
+        attachments.append(attachment)
+        stage_a["photo_attachments"] = attachments
+        row.stage_a_json = stage_a
+        row.updated_at = now
+        await session.commit()
+    return stage_a
+
+
 async def _require_case(session: AsyncSession, case_id: str) -> CaseRow:
     row = await session.get(CaseRow, case_id)
     if row is None:
