@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field
 
 from app.auth_deps import AuthContext, get_auth_context
@@ -13,8 +13,11 @@ from app.case_validation import validate_case_id
 from app.chat_dispatch import chat_event_dispatch
 from app.demo_case_service import seed_demo_accident_case
 from app.deps import ensure_ai_ready, ensure_db_ready
+from app.incident_photo_upload import save_incident_photo
+from app.paths import LOCAL_INCIDENT_PHOTO_STORAGE_ROOT
 from app import case_service
 from models.ai_types import ChatEventTrigger, Participant
+from models.accident_types import PhotoCategory
 
 router = APIRouter(tags=["cases"])
 
@@ -129,6 +132,47 @@ async def accident_stage_a(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Case not found.") from exc
     return {"case_id": normalized, "stage_a": merged}
+
+
+@router.post("/cases/{case_id}/incident-photos")
+async def upload_incident_photo(
+    case_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    category: str = Form(default=PhotoCategory.OTHER.value),
+    caption: str | None = Form(default=None, max_length=280),
+    taken_at: datetime | None = Form(default=None),
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
+    ensure_db_ready(request)
+    normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
+    try:
+        photo_category = PhotoCategory(category)
+    except ValueError as exc:
+        allowed = ", ".join(item.value for item in PhotoCategory)
+        raise HTTPException(status_code=400, detail=f"Invalid category. Allowed values: {allowed}") from exc
+
+    photo_id, storage_key = await save_incident_photo(normalized, file, LOCAL_INCIDENT_PHOTO_STORAGE_ROOT)
+    attachment: dict[str, Any] = {
+        "photo_id": photo_id,
+        "category": photo_category.value,
+        "storage_key": storage_key,
+        "caption": caption,
+        "taken_at": taken_at.isoformat() if taken_at is not None else None,
+    }
+    try:
+        stage_a = await case_service.append_stage_a_photo_attachment(normalized, attachment)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Case not found.") from exc
+    return {
+        "case_id": normalized,
+        "photo_attachment": attachment,
+        "stage_a": stage_a,
+    }
 
 
 @router.patch("/cases/{case_id}/accident/stage-b")
