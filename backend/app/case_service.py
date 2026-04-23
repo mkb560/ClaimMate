@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai.accident.report_payload_builder import build_accident_chat_context, build_accident_report_payload
 from ai.ingestion.vector_store import get_sessionmaker, replace_case_chunks
 from app.accident_codec import _jsonable, deep_merge, stage_a_from_dict, stage_b_from_dict
+from models.auth_orm import CaseMembershipRow
 from models.case_orm import CaseChatMessageRow, CaseRow, generate_case_id
 
 
@@ -252,6 +254,27 @@ async def list_chat_messages(case_id: str, *, limit: int = 100, offset: int = 0)
         result = await session.scalars(stmt)
         rows = result.all()
     return [_serialize_chat_message_row(r) for r in rows]
+
+
+async def list_user_cases(user_id: uuid.UUID) -> list[dict[str, Any]]:
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as session:
+        stmt = (
+            select(CaseMembershipRow, CaseRow)
+            .join(CaseRow, CaseMembershipRow.case_id == CaseRow.id)
+            .where(CaseMembershipRow.user_id == user_id)
+            .order_by(CaseRow.created_at.desc())
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+    return [
+        {
+            "case_id": membership.case_id,
+            "role": membership.role,
+            "created_at": _jsonable(case_row.created_at),
+        }
+        for membership, case_row in rows
+    ]
 
 
 async def delete_case_and_related_data(case_id: str) -> bool:

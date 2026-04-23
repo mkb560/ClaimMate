@@ -52,6 +52,18 @@ class ChatMessageSimpleBody(BaseModel):
     participants: list[ParticipantIn] | None = None
 
 
+@router.get("/cases")
+async def list_cases(
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
+    ensure_db_ready(request)
+    if ctx.user is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    cases = await case_service.list_user_cases(ctx.user.id)
+    return {"cases": cases}
+
+
 @router.post("/cases", status_code=201)
 async def create_case(
     request: Request,
