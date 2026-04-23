@@ -35,11 +35,7 @@ export default function CasesPage() {
   }, [token, router])
 
   async function handleDelete(id: string) {
-    try {
-      await deleteCase(id)
-    } catch {
-      // best-effort
-    }
+    try { await deleteCase(id) } catch { /* best-effort */ }
     removeCaseName(id)
     setCases((prev) => prev.filter((c) => c.id !== id))
   }
