@@ -150,6 +150,7 @@ export default function StageAPage() {
       </div>
       <StageAForm
         key={caseId}
+        caseId={caseId}
         initial={initial}
         onSubmit={handleSubmit}
         loading={loading}

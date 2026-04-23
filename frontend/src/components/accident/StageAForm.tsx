@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { IncidentPhotoUpload } from './IncidentPhotoUpload'
 
 type TriState = 'unknown' | 'true' | 'false'
 
@@ -82,11 +83,13 @@ function TriStateToggle({
 }
 
 export function StageAForm({
+  caseId,
   initial,
   onSubmit,
   loading,
   error,
 }: {
+  caseId: string
   initial: StageAData
   onSubmit: (data: StageAData) => Promise<void>
   loading: boolean
@@ -215,6 +218,14 @@ export function StageAForm({
             value={form.tow_requested}
             onChange={(v) => set('tow_requested', v)}
           />
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="font-semibold text-slate-900">Incident Photos</h3>
+        <p className="mt-1 text-xs text-slate-500">Upload photos right after the accident — JPG, PNG, or WEBP, max 10 MB each.</p>
+        <div className="mt-4">
+          <IncidentPhotoUpload caseId={caseId} />
         </div>
       </Card>
 

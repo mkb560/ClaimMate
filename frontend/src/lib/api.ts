@@ -458,6 +458,36 @@ export type UserCaseEntry = {
   created_at: string
 }
 
+export async function uploadIncidentPhoto(
+  caseId: string,
+  file: File,
+  category: string
+): Promise<{ photo_id: string; storage_key: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('category', category)
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/incident-photos`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders() },
+    body: formData,
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || 'Upload failed')
+  }
+  return response.json() as Promise<{ photo_id: string; storage_key: string }>
+}
+
+export async function fetchIncidentPhotoBlobUrl(caseId: string, photoId: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/incident-photos/${photoId}`, {
+    headers: { ...getAuthHeaders() },
+    cache: 'no-store',
+  })
+  if (!response.ok) throw new Error('Photo fetch failed')
+  const blob = await response.blob()
+  return URL.createObjectURL(blob)
+}
+
 export async function getUserCases(): Promise<UserCaseEntry[]> {
   const response = await fetch(`${API_BASE_URL}/cases`, {
     method: 'GET',

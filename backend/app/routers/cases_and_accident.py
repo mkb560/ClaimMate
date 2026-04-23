@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.auth_deps import AuthContext, get_auth_context
@@ -173,6 +174,34 @@ async def upload_incident_photo(
         "photo_attachment": attachment,
         "stage_a": stage_a,
     }
+
+
+@router.get("/cases/{case_id}/incident-photos/{photo_id}")
+async def get_incident_photo(
+    case_id: str,
+    photo_id: str,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> FileResponse:
+    ensure_db_ready(request)
+    normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
+    stage_a = row.stage_a_json or {}
+    attachments = stage_a.get("photo_attachments") or []
+    match = next((a for a in attachments if isinstance(a, dict) and a.get("photo_id") == photo_id), None)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Photo not found.")
+    storage_key: str = match["storage_key"]
+    file_path = LOCAL_INCIDENT_PHOTO_STORAGE_ROOT / storage_key
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Photo file not found.")
+    suffix = file_path.suffix.lower()
+    media_type_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+    media_type = media_type_map.get(suffix, "application/octet-stream")
+    return FileResponse(str(file_path), media_type=media_type)
 
 
 @router.patch("/cases/{case_id}/accident/stage-b")
