@@ -2,7 +2,7 @@
 
 ## 开场
 
-Hi, I’m Mingtao Ding, and this is Technical Milestone 3 for ClaimMate.
+Hi, I’m Mingtao Ding, and this is Milestone 3 for me.
 
 In Milestone 2, I showed policy question answering, structured accident data, generated report payloads, and stage-aware AI support for deadlines and disputes.
 
@@ -31,7 +31,7 @@ In Milestone 3, I build on that foundation and show what was added after Milesto
 
 如果你重录，请把日期或末尾数字换掉。
 
-这个版本建议录制 6 到 8 分钟，重点讲“在 Milestone 2 基础上，系统如何从单用户 AI demo 继续走向真实的协作型 claims product backend”。
+这个版本建议录制 3.5 到 5 分钟，重点讲“在 Milestone 2 基础上，系统如何从单用户 AI demo 继续走向更产品化的 authenticated backend”。更完整的多用户加入、聊天历史和实时房间，可以放到 Milestone 4 再讲。
 
 ### 1. 展示 `GET /health`
 
@@ -52,9 +52,11 @@ First, I’m checking the health endpoint.
 
 This confirms that the backend is live and that the AI system is ready.
 
-Just like in the previous milestones, this gives us a clean starting point for the demo. But in Milestone 3, the focus is no longer only AI behavior. The focus is how that AI is now connected to authenticated, collaborative case workflows.
+### 2. 展示认证流程：`POST /auth/register` + Swagger `Authorize` + `GET /auth/me`
 
-### 2. 展示 `POST /auth/register`
+这一段建议连续展示，这样可以少一个点，但逻辑更完整。
+
+#### 2A. 先展示 `POST /auth/register`
 
 1. 找到 `POST /auth/register`
 2. 点开
@@ -86,7 +88,7 @@ Here I’m registering a user for the first time. In the response, we can see an
 
 This means the system is no longer only a demo backend for anonymous calls. It now supports authenticated user identity, which is the foundation for case ownership, invite-based collaboration, and protected case access.
 
-### 3. 展示 Swagger `Authorize` + `GET /auth/me`
+#### 2B. 再展示 Swagger `Authorize` + `GET /auth/me`
 
 1. 先点击 Swagger 右上角 `Authorize`
 2. 在 Bearer token 输入框里粘贴上一步返回的 `access_token`
@@ -110,7 +112,7 @@ When I call `/auth/me`, the backend returns the current authenticated user.
 
 This is a simple step, but it is important because it shows that later case actions are tied to a real user identity instead of an anonymous demo request.
 
-### 4. 展示 `POST /cases`
+### 3. 展示 `POST /cases`
 
 1. 找到 `POST /cases`
 2. 点开
@@ -138,7 +140,7 @@ In Milestone 2, cases were mainly used as structured containers for policies, ac
 
 Because this request is authenticated, the backend can associate this new case with its owner, which is what makes the later invite and membership flow possible.
 
-### 5. 展示 `POST /cases/{case_id}/demo/seed-accident`
+### 4. 展示 `POST /cases/{case_id}/demo/seed-accident`
 
 1. 找到 `POST /cases/{case_id}/demo/seed-accident`
 2. 点开
@@ -163,30 +165,9 @@ In the response, we can see structured Stage A and Stage B data, claim timeline 
 
 So this step reuses the Milestone 2 accident workflow foundation, but now it lives inside an authenticated case that can later be shared with other participants.
 
-### 6. 展示 `GET /cases/{case_id}`
+### 5. 展示邀请能力：`POST /cases/{case_id}/invites`
 
-1. 找到 `GET /cases/{case_id}`
-2. 点开
-3. 点 `Try it out`
-4. 在 `case_id` 里填：`tm3-collab-20260418`
-5. 点 `Execute`
-6. 停一下，让画面显示 response body
-
-重点让老师看到：
-
-- `report_payload`
-- `chat_context`
-- `room_bootstrap`
-
-Script:
-
-Here I’m loading the current case snapshot.
-
-In the response, we can see that the backend is storing not just raw intake data, but also generated report content, reusable chat context, and room bootstrap data.
-
-That room bootstrap field is important, because it connects the structured accident workflow to later chat-room behavior. In other words, the backend is moving closer to a product flow where a case can be created, summarized, and then discussed collaboratively.
-
-### 7. 展示 `POST /cases/{case_id}/invites`
+这一段只展示 owner 侧创建 invite，先把“可共享能力”讲清楚。第二个用户真正加入 case 的 end-to-end flow，可以放到 Milestone 4 再讲。
 
 1. 找到 `POST /cases/{case_id}/invites`
 2. 点开
@@ -219,78 +200,9 @@ Here, as the owner, I’m creating a one-time invite for this case. In the respo
 
 This is important because it shows how ClaimMate can move from a single-user case into a multi-party collaboration flow, while still keeping access controlled.
 
-### 8. 展示 `GET /invites/lookup`
+### 6. 展示聊天 AI：`POST /cases/{case_id}/chat/messages`
 
-1. 找到 `GET /invites/lookup`
-2. 点开
-3. 点 `Try it out`
-4. 把上一步返回的 `token` 粘贴到 `token` 参数里
-5. 点 `Execute`
-6. 停一下，让画面显示 response body
-
-重点让老师看到：
-
-- `case_id`
-- `role`
-- `expires_at`
-- `valid`
-
-Script:
-
-This endpoint lets the system check whether an invite token is valid before it is accepted.
-
-In the response, we can see which case it belongs to, what role it grants, when it expires, and whether it is currently valid.
-
-So the backend now supports not only invite creation, but also a public validation step that can support real product flows like invite links or onboarding screens.
-
-### 9. 展示第二个用户的 `POST /auth/register` + `POST /auth/accept-invite`
-
-这一段建议你口头说明“现在切到第二个用户视角”，然后把 Swagger 的 Bearer token 改成第二个用户的新 token。
-
-1. 再执行一次 `POST /auth/register`
-2. request body 用：
-
-```json
-{
-  "email": "adjuster.tm3.20260418@example.com",
-  "password": "ClaimMate123",
-  "display_name": "Adjuster Demo"
-}
-```
-
-3. 复制新的 `access_token`
-4. 点击 Swagger 右上角 `Authorize`，把 Bearer token 替换成第二个用户的 token
-5. 找到 `POST /auth/accept-invite`
-6. 点 `Try it out`
-7. 在 request body 里填下面这段：
-
-```json
-{
-  "token": "PASTE_THE_INVITE_TOKEN_HERE"
-}
-```
-
-8. 点 `Execute`
-9. 停一下，让画面显示 response body
-
-重点让老师看到：
-
-- `case_id`
-- `accepted`
-
-Script:
-
-Now I’m switching to a second user to simulate a collaborating party.
-
-After registering that user, I replace the bearer token and call the invite acceptance endpoint with the token created earlier.
-
-In the response, we can see that the invite is accepted for the same case.
-
-So at this point, the system has moved from owner-only case creation into controlled case sharing, which is a major product-layer step beyond the Milestone 2 backend.
-
-### 10. 展示 `POST /cases/{case_id}/chat/messages`
-
-这一段建议改成展示 **更稳的 stage 3 deadline explainer**，不要用 denial dispute 版本。这样更适合录屏，因为它不依赖 dispute classifier 的偶发输出波动。
+这一段先只展示 case-aware chat AI。更完整的聊天历史 timeline 和 WebSocket room，可以放到 Milestone 4 再讲。
 
 1. 找到 `POST /cases/{case_id}/chat/messages`
 2. 点开
@@ -339,60 +251,18 @@ We can also see tracked deadline windows in the metadata, which means the backen
 
 So the AI behavior from Milestone 2 is now being exercised inside a more product-like, collaborative chat workflow.
 
-### 11. 展示 `GET /cases/{case_id}/chat/messages`
+### Milestone 4 可继续讲的点
 
-1. 找到 `GET /cases/{case_id}/chat/messages`
-2. 点开
-3. 点 `Try it out`
-4. 在 `case_id` 里填：`tm3-collab-20260418`
-5. 点 `Execute`
-6. 停一下，让画面显示 response body
+如果你后面要继续录 Milestone 4，很适合把这几个点接着讲：
 
-重点让老师看到：
-
-- `messages`
-- 用户消息和 AI 消息都在时间线里
-
-Script:
-
-Now I’m loading the stored chat history for this case.
-
-In the response, we can see an append-only timeline that includes the user message and the AI message.
-
-This is one of the clearest differences from Milestone 2. The system is no longer only producing one-off AI outputs. It now persists the conversation history, which is necessary for a real collaborative claims workflow.
-
-### 12. 可选加分片段：展示 `WS /ws/cases/{case_id}`
-
-如果你想多展示 20 到 30 秒，可以加一个很短的终端片段，不加也可以。
-
-建议展示方式：
-
-1. 打开一个终端，说明你现在演示的是实时房间原型
-2. 用两个 websocket client 连接：
-   - `ws://127.0.0.1:8010/ws/cases/tm3-collab-20260418?token=...`
-3. 发一个 `ping`
-4. 再发一个 `chat` JSON
-5. 展示另一个 client 也能收到 `user_message` 和 `ai_message`
-
-重点让老师看到：
-
-- `ready`
-- `pong`
-- `user_message`
-- `ai_message`
-
-Script:
-
-As an optional final step, I can also show the WebSocket room prototype.
-
-This is still a lightweight in-memory room rather than a production-scaled real-time system, but it demonstrates that the case can now support live collaborative messaging on top of the same shared AI dispatch logic.
-
-So by Milestone 3, ClaimMate is moving beyond document intelligence and into authenticated, multi-party, case-based communication.
+- 第二个用户 `POST /auth/accept-invite` 真正加入 case
+- `GET /cases/{case_id}/chat/messages` 展示 persistent chat history
+- `WS /ws/cases/{case_id}` 展示 real-time room prototype
 
 ## 结尾
 
-So, in Technical Milestone 3, I showed how ClaimMate evolved beyond the Milestone 2 AI workflow.
+So, in  Milestone 3, I showed how ClaimMate evolved beyond the Milestone 2 AI workflow.
 
-The backend now supports authenticated users, case ownership, invite-based collaboration, persistent chat history, and a real-time room prototype, while still keeping the earlier AI capabilities for policy understanding, accident context, deadlines, and disputes.
+The backend now supports authenticated users, case ownership, invite creation, and case-aware chat behavior, while still keeping the earlier AI capabilities for policy understanding, accident context, deadlines, and disputes.
 
-This makes the system feel much closer to a real collaborative claims product rather than only a collection of isolated AI demos.
+This makes the system feel much closer to a real product backend rather than only a collection of isolated AI demos, and it also sets up a clear path for Milestone 4 collaboration features.
