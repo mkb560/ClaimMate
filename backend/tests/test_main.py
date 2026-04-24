@@ -566,6 +566,50 @@ def test_upload_incident_photo_rejects_invalid_category(monkeypatch, tmp_path: P
     save_mock.assert_not_awaited()
 
 
+def test_get_incident_photo_returns_saved_file(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    storage_root = tmp_path / "incident_photos"
+    storage_key = "demo-case/photo-123-overview.png"
+    photo_path = storage_root / storage_key
+    photo_bytes = b"\x89PNG\r\n\x1a\nClaimMate test png bytes"
+    photo_path.parent.mkdir(parents=True)
+    photo_path.write_bytes(photo_bytes)
+
+    now = datetime.now(UTC)
+    fake_row = CaseRow(
+        id="demo-case",
+        claim_notice_at=None,
+        proof_of_claim_at=None,
+        last_deadline_alert_at=None,
+        stage_a_json={
+            "photo_attachments": [
+                {
+                    "photo_id": "photo-123",
+                    "category": "overview",
+                    "storage_key": storage_key,
+                    "caption": "front view",
+                    "taken_at": None,
+                }
+            ]
+        },
+        stage_b_json=None,
+        report_payload_json=None,
+        chat_context_json=None,
+        created_at=now,
+        updated_at=now,
+    )
+    monkeypatch.setattr(cases_and_accident.case_service, "get_case_row", AsyncMock(return_value=fake_row))
+    monkeypatch.setattr(cases_and_accident, "LOCAL_INCIDENT_PHOTO_STORAGE_ROOT", storage_root)
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.get("/cases/demo-case/incident-photos/photo-123")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content == photo_bytes
+
+
 def test_chat_event_persists_user_and_ai_when_model_responds(monkeypatch, tmp_path: Path) -> None:
     from app.routers import cases_and_accident
 

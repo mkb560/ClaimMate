@@ -26,28 +26,32 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setTokenState] = useState<string | null>(null)
-  const [user, setUser] = useState<AuthUser | null>(null)
-
   const isMock = process.env.NEXT_PUBLIC_MOCK_AUTH === 'true'
+  const [token, setTokenState] = useState<string | null>(() => getToken())
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (!isMock || !getToken()) return null
+    return { id: 'mock-user', email: 'dev@mock.local', display_name: 'Dev User' }
+  })
 
   useEffect(() => {
-    const stored = getToken()
-    if (!stored) return
-    setTokenState(stored)
-    if (isMock) {
-      setUser({ id: 'mock-user', email: 'dev@mock.local', display_name: 'Dev User' })
-      return
-    }
+    if (!token || isMock) return
+    let active = true
     // Restore user state from stored token
     getMe()
-      .then((u) => setUser(u))
+      .then((u) => {
+        if (active) setUser(u)
+      })
       .catch(() => {
+        if (!active) return
         // Token is invalid or expired — clear it
         clearToken()
         setTokenState(null)
+        setUser(null)
       })
-  }, [])
+    return () => {
+      active = false
+    }
+  }, [isMock, token])
 
   async function login(email: string, password: string) {
     if (isMock) {

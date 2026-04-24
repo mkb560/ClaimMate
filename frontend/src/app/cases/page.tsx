@@ -22,16 +22,23 @@ export default function CasesPage() {
       router.replace('/login')
       return
     }
-    setLoading(true)
-    setError('')
+    let active = true
     getUserCases()
       .then((entries) => {
+        if (!active) return
         setCases(entries.map((e) => ({ id: e.case_id, name: getCaseName(e.case_id) })))
+        setError('')
       })
       .catch((err) => {
+        if (!active) return
         setError(err instanceof Error ? err.message : 'Failed to load cases')
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
   }, [token, router])
 
   async function handleDelete(id: string) {
