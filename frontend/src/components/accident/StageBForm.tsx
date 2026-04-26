@@ -33,11 +33,13 @@ export function StageBForm({
   onSubmit,
   loading,
   error,
+  readOnly = false,
 }: {
   initial: StageBData
   onSubmit: (data: StageBData) => Promise<void>
   loading: boolean
   error: string
+  readOnly?: boolean
 }) {
   const [form, setForm] = useState<StageBData>(initial)
 
@@ -127,11 +129,17 @@ export function StageBForm({
           {error}
         </p>
       )}
-      <div className="flex justify-end">
-        <Button type="submit" loading={loading}>
-          Save & Continue →
-        </Button>
-      </div>
+      {readOnly ? (
+        <p className="text-center text-sm text-slate-500">
+          View only — you don&apos;t have permission to edit this.
+        </p>
+      ) : (
+        <div className="flex justify-end">
+          <Button type="submit" loading={loading}>
+            Save & Continue →
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

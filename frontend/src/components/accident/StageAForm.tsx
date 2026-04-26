@@ -88,12 +88,14 @@ export function StageAForm({
   onSubmit,
   loading,
   error,
+  readOnly = false,
 }: {
   caseId: string
   initial: StageAData
   onSubmit: (data: StageAData) => Promise<void>
   loading: boolean
   error: string
+  readOnly?: boolean
 }) {
   const [form, setForm] = useState<StageAData>(initial)
 
@@ -234,11 +236,17 @@ export function StageAForm({
           {error}
         </p>
       )}
-      <div className="flex justify-end">
-        <Button type="submit" loading={loading}>
-          Save & Continue →
-        </Button>
-      </div>
+      {readOnly ? (
+        <p className="text-center text-sm text-slate-500">
+          View only — you don&apos;t have permission to edit this.
+        </p>
+      ) : (
+        <div className="flex justify-end">
+          <Button type="submit" loading={loading}>
+            Save & Continue →
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

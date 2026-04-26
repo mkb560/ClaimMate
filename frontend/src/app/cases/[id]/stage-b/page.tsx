@@ -9,6 +9,7 @@ import {
   StageBData,
   EMPTY_STAGE_B,
 } from '@/components/accident/StageBForm'
+import { useCaseRole } from '@/hooks/useCaseRole'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
 
@@ -17,6 +18,8 @@ export default function StageBPage() {
   const params = useParams<{ id: string }>()
   const caseId = params.id
   const router = useRouter()
+  const role = useCaseRole(caseId)
+  const isOwner = role !== 'member'
   const [initial, setInitial] = useState<StageBData>(EMPTY_STAGE_B)
   const [fetchLoading, setFetchLoading] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -110,6 +113,7 @@ export default function StageBPage() {
         onSubmit={handleSubmit}
         loading={loading}
         error={error}
+        readOnly={!isOwner}
       />
     </div>
   )

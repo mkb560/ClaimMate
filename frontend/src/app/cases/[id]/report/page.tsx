@@ -8,6 +8,7 @@ import {
   generateAccidentReport,
   GenerateReportResponse,
 } from '@/lib/api'
+import { useCaseRole } from '@/hooks/useCaseRole'
 import { ReportView } from '@/components/report/ReportView'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
@@ -17,6 +18,8 @@ export default function ReportPage() {
   const params = useParams<{ id: string }>()
   const caseId = params.id
   const router = useRouter()
+  const role = useCaseRole(caseId)
+  const isOwner = role !== 'member'
   const [report, setReport] = useState<GenerateReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -84,18 +87,20 @@ export default function ReportPage() {
             AI-generated summary of your accident details.
           </p>
         </div>
-        <div className="flex gap-2">
-          {!report && (
-            <Button loading={generating} onClick={handleGenerate}>
-              Generate Report
-            </Button>
-          )}
-          {report && (
-            <Button variant="secondary" loading={generating} onClick={handleGenerate}>
-              Regenerate
-            </Button>
-          )}
-        </div>
+        {isOwner && (
+          <div className="flex gap-2">
+            {!report && (
+              <Button loading={generating} onClick={handleGenerate}>
+                Generate Report
+              </Button>
+            )}
+            {report && (
+              <Button variant="secondary" loading={generating} onClick={handleGenerate}>
+                Regenerate
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (

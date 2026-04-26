@@ -22,7 +22,8 @@ class AIConfig(BaseSettings):
     embedding_model: str = "text-embedding-3-large"
     cors_allow_origins: str = (
         "http://localhost:3000,http://127.0.0.1:3000,"
-        "http://localhost:5173,http://127.0.0.1:5173"
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "https://claim-mate-sigma.vercel.app"
     )
     cors_allow_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     database_url: str = ""

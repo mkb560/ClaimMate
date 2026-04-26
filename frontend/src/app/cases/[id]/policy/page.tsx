@@ -14,6 +14,7 @@ import {
 import { DemoPolicyPicker } from '@/components/policy/DemoPolicyPicker'
 import { PolicyUpload } from '@/components/policy/PolicyUpload'
 import { AskPanel } from '@/components/policy/AskPanel'
+import { useCaseRole } from '@/hooks/useCaseRole'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -24,6 +25,8 @@ export default function PolicyPage() {
   const params = useParams<{ id: string }>()
   const caseId = params.id
   const router = useRouter()
+  const role = useCaseRole(caseId)
+  const isOwner = role !== 'member'
 
   const [policyStatus, setPolicyStatus] =
     useState<CasePolicyStatusResponse | null>(null)
@@ -132,12 +135,14 @@ export default function PolicyPage() {
               </strong>{' '}
               is indexed ({policyStatus.chunk_count} chunks)
             </p>
-            <button
-              onClick={() => setReplacing((r) => !r)}
-              className="ml-4 shrink-0 text-sm text-blue-600 hover:underline"
-            >
-              {replacing ? 'Cancel' : 'Replace'}
-            </button>
+            {isOwner && (
+              <button
+                onClick={() => setReplacing((r) => !r)}
+                className="ml-4 shrink-0 text-sm text-blue-600 hover:underline"
+              >
+                {replacing ? 'Cancel' : 'Replace'}
+              </button>
+            )}
           </div>
         ) : (
           <p className="mt-2 text-sm text-slate-600">
@@ -151,7 +156,7 @@ export default function PolicyPage() {
         )}
       </Card>
 
-      {(!policyStatus?.has_policy || replacing) && (
+      {isOwner && (!policyStatus?.has_policy || replacing) && (
         <>
           <DemoPolicyPicker
             policies={demoPolicies}
