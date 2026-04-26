@@ -23,6 +23,7 @@ export type DisplayMessage = {
   role: 'user' | 'ai' | 'system'
   text: string
   citations?: unknown[]
+  senderName?: string
 }
 
 export function ChatBubble({ message }: { message: DisplayMessage }) {
@@ -45,7 +46,12 @@ export function ChatBubble({ message }: { message: DisplayMessage }) {
     : splitDisclaimer(message.text)
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+      {message.senderName && (
+        <span className="mb-1 px-1 text-xs text-slate-400">
+          {message.senderName}
+        </span>
+      )}
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
           isUser

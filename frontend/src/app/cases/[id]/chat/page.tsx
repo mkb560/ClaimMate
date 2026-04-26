@@ -3,26 +3,47 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getChatMessages, ChatMessageRow, createInvite } from '@/lib/api'
+import { getChatMessages, ChatMessageRow, createInvite, AuthUser } from '@/lib/api'
 import { useWebSocketChat, WsMessage } from '@/hooks/useWebSocketChat'
+import { useCaseRole } from '@/hooks/useCaseRole'
 import { ChatWindow } from '@/components/chat/ChatWindow'
 import { ChatInput } from '@/components/chat/ChatInput'
 import { DisplayMessage } from '@/components/chat/ChatBubble'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 
-function rowToDisplay(row: ChatMessageRow): DisplayMessage {
+function resolveSenderName(
+  senderRole: string | null | undefined,
+  user: AuthUser | null,
+  currentRole: string | null
+): string {
+  if (!senderRole) return 'User'
+  if (senderRole === currentRole && user) {
+    return user.display_name || user.email
+  }
+  return senderRole === 'owner' ? 'Owner' : senderRole === 'member' ? 'Member' : senderRole
+}
+
+function rowToDisplay(row: ChatMessageRow, user: AuthUser | null, currentRole: string | null): DisplayMessage {
   return {
     id: row.id,
     role: row.message_type === 'ai' ? 'ai' : 'user',
     text: row.body_text,
     citations: row.ai_payload?.citations,
+    senderName: row.message_type === 'ai'
+      ? 'ClaimMate'
+      : resolveSenderName(row.sender_role, user, currentRole),
   }
 }
 
-function wsToDisplay(msg: WsMessage): DisplayMessage | null {
+function wsToDisplay(msg: WsMessage, user: AuthUser | null, currentRole: string | null): DisplayMessage | null {
   if (msg.type === 'user_message') {
-    return { id: msg.id, role: 'user', text: msg.message_text || '' }
+    return {
+      id: msg.id,
+      role: 'user',
+      text: msg.message_text || '',
+      senderName: resolveSenderName(msg.sender_role, user, currentRole),
+    }
   }
   if (msg.type === 'ai_message' && msg.payload) {
     return {
@@ -30,6 +51,7 @@ function wsToDisplay(msg: WsMessage): DisplayMessage | null {
       role: 'ai',
       text: msg.payload.text,
       citations: msg.payload.citations,
+      senderName: 'ClaimMate',
     }
   }
   if (msg.type === 'system' && msg.event) {
@@ -39,10 +61,11 @@ function wsToDisplay(msg: WsMessage): DisplayMessage | null {
 }
 
 export default function ChatPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const params = useParams<{ id: string }>()
   const caseId = params.id
   const router = useRouter()
+  const role = useCaseRole(caseId)
   const [history, setHistory] = useState<DisplayMessage[]>([])
   const [isAiTyping, setIsAiTyping] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -64,7 +87,9 @@ export default function ChatPage() {
 
   function handleSend(text: string) {
     sendMessage(text)
-    setIsAiTyping(true)
+    if (/@ai\b/i.test(text)) {
+      setIsAiTyping(true)
+    }
   }
 
   async function handleCreateInvite() {
@@ -94,18 +119,18 @@ export default function ChatPage() {
       return
     }
     getChatMessages(caseId)
-      .then((r) => setHistory(r.messages.map(rowToDisplay)))
+      .then((r) => setHistory(r.messages.map((m) => rowToDisplay(m, user, role))))
       .catch(() => {})
   }, [token, caseId, router])
 
   const allMessages = useMemo(() => {
     const historyIds = new Set(history.map((m) => m.id))
     const wsDisplay = wsMessages.flatMap((m) => {
-      const d = wsToDisplay(m)
+      const d = wsToDisplay(m, user, role)
       return d && !historyIds.has(d.id) ? [d] : []
     })
     return [...history, ...wsDisplay]
-  }, [history, wsMessages])
+  }, [history, wsMessages, user, role])
 
   const statusColor =
     status === 'open'
