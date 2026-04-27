@@ -84,6 +84,25 @@ async def is_case_member(case_id: str, user_id: uuid.UUID) -> bool:
     return await get_membership(case_id, user_id) is not None
 
 
+async def list_case_members(case_id: str) -> list[dict[str, Any]]:
+    sessionmaker = get_sessionmaker()
+    async with sessionmaker() as session:
+        stmt = (
+            select(CaseMembershipRow)
+            .where(CaseMembershipRow.case_id == case_id)
+            .order_by(CaseMembershipRow.role.asc())
+        )
+        result = await session.scalars(stmt)
+        rows = result.all()
+    return [
+        {
+            "user_id": str(row.user_id),
+            "role": row.role,
+        }
+        for row in rows
+    ]
+
+
 async def add_case_member(case_id: str, user_id: uuid.UUID, role: str) -> CaseMembershipRow:
     sessionmaker = get_sessionmaker()
     now = _utcnow()

@@ -451,6 +451,44 @@ def test_get_case_snapshot_returns_404_for_missing_case(monkeypatch, tmp_path: P
     assert response.json() == {"detail": "Case not found."}
 
 
+def test_get_case_members_returns_membership_participants(monkeypatch, tmp_path: Path) -> None:
+    from app.routers import cases_and_accident
+
+    monkeypatch.setattr(
+        cases_and_accident.case_service,
+        "get_case_row",
+        AsyncMock(
+            return_value=CaseRow(
+                id="demo-case",
+                created_at=datetime(2026, 4, 3, tzinfo=UTC),
+                updated_at=datetime(2026, 4, 3, tzinfo=UTC),
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        cases_and_accident,
+        "list_case_members",
+        AsyncMock(
+            return_value=[
+                {"user_id": "owner-1", "role": "owner"},
+                {"user_id": "adjuster-1", "role": "adjuster"},
+            ]
+        ),
+    )
+
+    with _build_client(monkeypatch, tmp_path) as client:
+        response = client.get("/cases/demo-case/members")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "case_id": "demo-case",
+        "members": [
+            {"user_id": "owner-1", "role": "owner"},
+            {"user_id": "adjuster-1", "role": "adjuster"},
+        ],
+    }
+
+
 def test_seed_accident_demo_endpoint_returns_seeded_payload(monkeypatch, tmp_path: Path) -> None:
     from app.routers import cases_and_accident
 

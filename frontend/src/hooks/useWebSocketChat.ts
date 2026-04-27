@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { API_BASE_URL } from '@/lib/api'
 
 export type WsMessage = {
   id: string
@@ -21,17 +22,25 @@ export type WsMessage = {
 
 export type WsStatus = 'connecting' | 'open' | 'closed' | 'error'
 
-const BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'https://exasperatingly-unprologued-elease.ngrok-free.dev'
-).replace(/^http/, 'ws')
+export type WsParticipant = {
+  user_id: string
+  role: string
+}
+
+export type UseWebSocketChatOptions = {
+  senderRole?: string
+  inviteSent?: boolean
+  participants?: WsParticipant[]
+}
+
+const BASE_URL = API_BASE_URL.replace(/^http/, 'ws')
 
 const MAX_RETRIES = 5
 
 export function useWebSocketChat(
   caseId: string,
   token: string | null,
-  senderRole: string = 'owner'
+  options: UseWebSocketChatOptions = {}
 ): {
   messages: WsMessage[]
   sendMessage: (text: string) => void
@@ -40,6 +49,12 @@ export function useWebSocketChat(
   const [messages, setMessages] = useState<WsMessage[]>([])
   const [status, setStatus] = useState<WsStatus>('connecting')
   const wsRef = useRef<WebSocket | null>(null)
+  const senderRole = options.senderRole ?? 'owner'
+  const inviteSent = options.inviteSent ?? false
+  const participants = useMemo(
+    () => options.participants ?? [{ user_id: 'owner-1', role: senderRole }],
+    [options.participants, senderRole]
+  )
 
   useEffect(() => {
     if (!token || !caseId) {
@@ -112,11 +127,12 @@ export function useWebSocketChat(
         type: 'chat',
         message_text: text,
         sender_role: senderRole,
-        invite_sent: false,
+        invite_sent: inviteSent,
+        participants,
         run_ai: true,
       })
     )
-  }, [senderRole])
+  }, [inviteSent, participants, senderRole])
 
   return { messages, sendMessage, status }
 }

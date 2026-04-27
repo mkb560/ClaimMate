@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getChatMessages, ChatMessageRow, createInvite, AuthUser } from '@/lib/api'
+import {
+  AuthUser,
+  CaseMemberEntry,
+  ChatMessageRow,
+  createInvite,
+  getCaseMembers,
+  getChatMessages,
+} from '@/lib/api'
 import { useWebSocketChat, WsMessage } from '@/hooks/useWebSocketChat'
 import { useCaseRole } from '@/hooks/useCaseRole'
 import { ChatWindow } from '@/components/chat/ChatWindow'
@@ -75,10 +82,25 @@ export default function ChatPage() {
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [caseMembers, setCaseMembers] = useState<CaseMemberEntry[]>([])
+  const [inviteSent, setInviteSent] = useState(false)
+  const currentMember = caseMembers.find((member) => member.user_id === user?.user_id)
+  const senderRole = currentMember?.role ?? role ?? 'owner'
+  const participants = useMemo(
+    () =>
+      caseMembers.length > 0
+        ? caseMembers.map((member) => ({ user_id: member.user_id, role: member.role }))
+        : [{ user_id: user?.user_id ?? 'owner-1', role: senderRole }],
+    [caseMembers, senderRole, user?.user_id]
+  )
   const { messages: wsMessages, sendMessage, status } = useWebSocketChat(
     caseId,
     token,
-    role ?? 'owner'
+    {
+      senderRole,
+      inviteSent: inviteSent || participants.length > 1,
+      participants,
+    }
   )
 
   useEffect(() => {
@@ -99,9 +121,10 @@ export default function ChatPage() {
     setInviteLoading(true)
     setInviteError('')
     try {
-      const res = await createInvite(caseId)
+      const res = await createInvite(caseId, 'adjuster')
       const link = `${window.location.origin}/invites/accept?token=${encodeURIComponent(res.token)}`
       setInviteLink(link)
+      setInviteSent(true)
       setShowInviteModal(true)
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : 'Failed to create invite')
@@ -121,10 +144,18 @@ export default function ChatPage() {
       router.replace('/login')
       return
     }
-    getChatMessages(caseId)
-      .then((r) => setHistory(r.messages.map((m) => rowToDisplay(m, user, role))))
+    Promise.all([
+      getChatMessages(caseId),
+      getCaseMembers(caseId).catch(() => [] as CaseMemberEntry[]),
+    ])
+      .then(([chat, members]) => {
+        const loadedRole = members.find((member) => member.user_id === user?.user_id)?.role ?? role
+        setHistory(chat.messages.map((m) => rowToDisplay(m, user, loadedRole)))
+        setCaseMembers(members)
+        setInviteSent(members.length > 1)
+      })
       .catch(() => {})
-  }, [token, caseId, router])
+  }, [token, caseId, router, user, role])
 
   const allMessages = useMemo(() => {
     const historyIds = new Set(history.map((m) => m.id))

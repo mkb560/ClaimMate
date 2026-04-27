@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() => getToken())
   const [user, setUser] = useState<AuthUser | null>(() => {
     if (!isMock || !getToken()) return null
-    return { id: 'mock-user', email: 'dev@mock.local', display_name: 'Dev User' }
+    return { user_id: 'mock-user', email: 'dev@mock.local', display_name: 'Dev User' }
   })
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const mockToken = 'mock-token'
       setToken(mockToken)
       setTokenState(mockToken)
-      setUser({ id: `mock-${email}`, email, display_name: 'Dev User' })
+      setUser({ user_id: `mock-${email}`, email, display_name: 'Dev User' })
       return
     }
     const data = await loginUser(email, password)
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const mockToken = 'mock-token'
       setToken(mockToken)
       setTokenState(mockToken)
-      setUser({ id: `mock-${email}`, email, display_name: displayName ?? 'Dev User' })
+      setUser({ user_id: `mock-${email}`, email, display_name: displayName ?? 'Dev User' })
       return
     }
     const data = await registerUser(email, password, displayName)

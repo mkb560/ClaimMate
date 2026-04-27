@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.auth_deps import AuthContext, get_auth_context
-from app.auth_service import add_case_owner_if_absent
+from app.auth_service import add_case_owner_if_absent, list_case_members
 from app.case_access import assert_can_access_case, assert_can_create_case
 from app.case_validation import validate_case_id
 from app.chat_dispatch import chat_event_dispatch
@@ -101,6 +101,21 @@ async def get_case_snapshot(
         raise HTTPException(status_code=404, detail="Case not found.")
     await assert_can_access_case(normalized, ctx)
     return case_service.serialize_case_snapshot(row)
+
+
+@router.get("/cases/{case_id}/members")
+async def list_case_members_for_case(
+    case_id: str,
+    request: Request,
+    ctx: AuthContext = Depends(get_auth_context),
+) -> dict[str, object]:
+    ensure_db_ready(request)
+    normalized = validate_case_id(case_id)
+    row = await case_service.get_case_row(normalized)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case not found.")
+    await assert_can_access_case(normalized, ctx)
+    return {"case_id": normalized, "members": await list_case_members(normalized)}
 
 
 @router.post("/cases/{case_id}/demo/seed-accident")

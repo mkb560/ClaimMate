@@ -1,8 +1,8 @@
 import { getToken } from './auth'
 
-const API_BASE_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'https://exasperatingly-unprologued-elease.ngrok-free.dev'
+  'https://claimmate-backend-production.up.railway.app'
 
 function getAuthHeaders(): Record<string, string> {
   const token = getToken()
@@ -460,11 +460,30 @@ export type UserCaseEntry = {
   created_at: string
 }
 
+export type CaseMemberEntry = {
+  user_id: string
+  role: string
+}
+
+export type IncidentPhotoAttachment = {
+  photo_id: string
+  category: string
+  storage_key: string
+  caption: string | null
+  taken_at: string | null
+}
+
+export type UploadIncidentPhotoResponse = {
+  case_id: string
+  photo_attachment: IncidentPhotoAttachment
+  stage_a: Record<string, unknown>
+}
+
 export async function uploadIncidentPhoto(
   caseId: string,
   file: File,
   category: string
-): Promise<{ photo_id: string; storage_key: string }> {
+): Promise<UploadIncidentPhotoResponse> {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('category', category)
@@ -477,7 +496,7 @@ export async function uploadIncidentPhoto(
     const error = await response.json().catch(() => null)
     throw new Error(error?.detail || 'Upload failed')
   }
-  return response.json() as Promise<{ photo_id: string; storage_key: string }>
+  return response.json() as Promise<UploadIncidentPhotoResponse>
 }
 
 export async function fetchIncidentPhotoBlobUrl(caseId: string, photoId: string): Promise<string> {
@@ -502,6 +521,20 @@ export async function getUserCases(): Promise<UserCaseEntry[]> {
   }
   const data = await response.json() as { cases: UserCaseEntry[] }
   return data.cases
+}
+
+export async function getCaseMembers(caseId: string): Promise<CaseMemberEntry[]> {
+  const response = await fetch(`${API_BASE_URL}/cases/${caseId}/members`, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { ...getAuthHeaders() },
+  })
+  if (!response.ok) {
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.detail || 'Failed to load case members')
+  }
+  const data = await response.json() as { members: CaseMemberEntry[] }
+  return data.members
 }
 
 export async function createCase(caseId?: string) {
@@ -593,9 +626,10 @@ export async function seedAccidentDemoCase(caseId: string) {
 }
 
 export type AuthUser = {
-  id: string
+  user_id: string
   email: string
   display_name: string | null
+  created_at?: string
 }
 
 export type AuthResponse = {

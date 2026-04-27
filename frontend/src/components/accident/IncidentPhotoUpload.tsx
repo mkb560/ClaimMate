@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import { uploadIncidentPhoto, fetchIncidentPhotoBlobUrl, getCaseSnapshot } from '@/lib/api'
 import { Spinner } from '@/components/ui/Spinner'
 
@@ -126,9 +127,12 @@ export function IncidentPhotoUpload({ caseId }: { caseId: string }) {
           <div className="flex flex-wrap gap-3">
             {section.photos.map((photo) => (
               <div key={photo.id} className="relative h-24 w-24 shrink-0">
-                <img
+                <Image
                   src={photo.previewUrl}
                   alt={photo.name}
+                  width={96}
+                  height={96}
+                  unoptimized
                   className="h-full w-full rounded-xl object-cover border border-slate-200"
                 />
                 {photo.status === 'uploading' && (
