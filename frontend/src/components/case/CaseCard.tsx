@@ -57,7 +57,7 @@ export function CaseCard({ caseId, name, onDelete, onRename }: CaseCardProps) {
       <div className="flex shrink-0 items-center gap-2">
         <Button
           variant="secondary"
-          onClick={() => router.push(`/cases/${caseId}/policy`)}
+          onClick={() => router.push(`/cases/${caseId}/stage-a`)}
         >
           Open →
         </Button>

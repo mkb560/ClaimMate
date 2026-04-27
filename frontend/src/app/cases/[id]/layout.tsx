@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { StepIndicator } from '@/components/case/StepIndicator'
 
-const STEP_PATHS = ['policy', 'stage-a', 'stage-b', 'report', 'chat']
+const STEP_PATHS = ['stage-a', 'stage-b', 'report', 'chat']
 
 export default function CaseLayout({
   children,

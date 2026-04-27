@@ -9,6 +9,7 @@ import {
   StageBData,
   EMPTY_STAGE_B,
 } from '@/components/accident/StageBForm'
+import { PolicyWorkspace } from '@/components/policy/PolicyWorkspace'
 import { useCaseRole } from '@/hooks/useCaseRole'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
@@ -104,8 +105,17 @@ export default function StageBPage() {
           Step 3: Accident Details
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Add more context to strengthen your claim.
+          Add more context and attach your policy once the urgent basics are saved.
         </p>
+      </div>
+      <div className="mb-6">
+        <PolicyWorkspace
+          caseId={caseId}
+          canEdit={isOwner}
+          title="Policy & Coverage Materials"
+          intro="Choose a demo policy or upload your own PDF here. ClaimMate can use it later for coverage questions and claim support."
+          showAskPanel={false}
+        />
       </div>
       <StageBForm
         key={caseId}

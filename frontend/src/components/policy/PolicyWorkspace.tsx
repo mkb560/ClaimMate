@@ -27,6 +27,7 @@ type PolicyWorkspaceProps = {
   backLabel?: string
   nextHref?: string
   nextLabel?: string
+  showAskPanel?: boolean
 }
 
 export function PolicyWorkspace({
@@ -38,6 +39,7 @@ export function PolicyWorkspace({
   backLabel = 'Back',
   nextHref,
   nextLabel = 'Next',
+  showAskPanel = true,
 }: PolicyWorkspaceProps) {
   const router = useRouter()
   const [policyStatus, setPolicyStatus] =
@@ -172,7 +174,7 @@ export function PolicyWorkspace({
         </>
       )}
 
-      {policyStatus?.has_policy && <AskPanel caseId={caseId} />}
+      {showAskPanel && policyStatus?.has_policy && <AskPanel caseId={caseId} />}
 
       {nextHref && (
         <div className="flex justify-end">

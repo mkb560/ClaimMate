@@ -26,7 +26,7 @@ export default function NewCasePage() {
     try {
       const { case_id } = await createCase()
       setCaseName(case_id, name.trim() || case_id)
-      router.push(`/cases/${case_id}/policy`)
+      router.push(`/cases/${case_id}/stage-a`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create case')
     } finally {

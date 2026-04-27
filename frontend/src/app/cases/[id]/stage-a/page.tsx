@@ -177,7 +177,7 @@ export default function StageAPage() {
   return (
     <div>
       <div className="mb-4">
-        <Button variant="ghost" onClick={() => router.push(`/cases/${caseId}/policy`)}>
+        <Button variant="ghost" onClick={() => router.push('/cases')}>
           ← Back
         </Button>
       </div>
