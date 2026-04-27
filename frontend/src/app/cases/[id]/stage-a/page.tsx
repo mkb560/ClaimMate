@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { getCaseSnapshot, patchAccidentStageA } from '@/lib/api'
+import type { AuthUser, CasePolicyStatusResponse } from '@/lib/api'
+import {
+  getCasePolicyStatus,
+  getCaseSnapshot,
+  patchAccidentStageA,
+} from '@/lib/api'
 import {
   StageAForm,
   StageAData,
@@ -32,8 +37,55 @@ function triStateToBool(v: string): boolean | null {
   return null
 }
 
+function textValue(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : ''
+}
+
+function firstPolicyholder(prefill?: CasePolicyStatusResponse['prefill']): string {
+  const policyholders = prefill?.policyholders
+  if (!policyholders) return ''
+  return policyholders.split(',')[0]?.trim() || ''
+}
+
+function userDisplayName(user: AuthUser | null): string {
+  if (!user) return ''
+  const displayName = textValue(user.display_name)
+  if (displayName) return displayName
+  return user.email.split('@')[0]?.trim() || ''
+}
+
+function buildInitialStageA(
+  stageA: unknown,
+  prefill: CasePolicyStatusResponse['prefill'] | undefined,
+  user: AuthUser | null
+): StageAData {
+  const a = (stageA as Record<string, unknown>) || {}
+  const loc = (a.location as Record<string, unknown>) || {}
+  const own = (a.owner_party as Record<string, unknown>) || {}
+  const oth = (a.other_party as Record<string, unknown>) || {}
+  const ownerName = textValue(own.name) || userDisplayName(user) || firstPolicyholder(prefill)
+
+  return {
+    occurred_at: toDateTimeLocal(a.occurred_at),
+    address: textValue(loc.address),
+    quick_summary: textValue(a.quick_summary),
+    owner_name: ownerName,
+    owner_phone: textValue(own.phone),
+    owner_insurer: textValue(own.insurer) || textValue(prefill?.insurer),
+    owner_policy_number: textValue(own.policy_number) || textValue(prefill?.policy_number),
+    other_name: textValue(oth.name),
+    other_phone: textValue(oth.phone),
+    other_insurer: textValue(oth.insurer),
+    other_policy_number: textValue(oth.policy_number),
+    injuries_reported: boolToTriState(a.injuries_reported),
+    police_called: boolToTriState(a.police_called),
+    drivable: boolToTriState(a.drivable),
+    tow_requested: boolToTriState(a.tow_requested),
+  }
+}
+
 export default function StageAPage() {
-  const { token } = useAuth()
+  const { token, user } = useAuth()
   const params = useParams<{ id: string }>()
   const caseId = params.id
   const router = useRouter()
@@ -50,37 +102,23 @@ export default function StageAPage() {
       router.replace('/login')
       return
     }
+    if (!user) return
 
     let cancelled = false
 
     async function load() {
       try {
-        const snap = await getCaseSnapshot(caseId)
-        if (!cancelled && snap.stage_a) {
-          const a = snap.stage_a as Record<string, unknown>
-          const loc = (a.location as Record<string, unknown>) || {}
-          const own = (a.owner_party as Record<string, unknown>) || {}
-          const oth = (a.other_party as Record<string, unknown>) || {}
-          setInitial({
-            occurred_at: toDateTimeLocal(a.occurred_at),
-            address: String(loc.address || ''),
-            quick_summary: String(a.quick_summary || ''),
-            owner_name: String(own.name || ''),
-            owner_phone: String(own.phone || ''),
-            owner_insurer: String(own.insurer || ''),
-            owner_policy_number: String(own.policy_number || ''),
-            other_name: String(oth.name || ''),
-            other_phone: String(oth.phone || ''),
-            other_insurer: String(oth.insurer || ''),
-            other_policy_number: String(oth.policy_number || ''),
-            injuries_reported: boolToTriState(a.injuries_reported),
-            police_called: boolToTriState(a.police_called),
-            drivable: boolToTriState(a.drivable),
-            tow_requested: boolToTriState(a.tow_requested),
-          })
+        const [snap, policyStatus] = await Promise.all([
+          getCaseSnapshot(caseId),
+          getCasePolicyStatus(caseId).catch(() => null),
+        ])
+        if (!cancelled) {
+          setInitial(buildInitialStageA(snap.stage_a, policyStatus?.prefill, user))
         }
       } catch {
-        // blank form is fine for new cases
+        if (!cancelled) {
+          setInitial(buildInitialStageA(null, undefined, user))
+        }
       } finally {
         if (!cancelled) setFetchLoading(false)
       }
@@ -88,7 +126,7 @@ export default function StageAPage() {
 
     load()
     return () => { cancelled = true }
-  }, [token, caseId, router])
+  }, [token, user, caseId, router])
 
   async function handleSubmit(data: StageAData) {
     setLoading(true)

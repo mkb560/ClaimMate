@@ -7,6 +7,7 @@ from typing import Any
 
 from ai.ingestion.ingest_policy import ingest_local_policy_file
 from ai.ingestion.vector_store import RetrievedChunk, list_policy_chunks
+from ai.policy.fact_extractor import PolicyFact, extract_policy_facts
 from app import case_service
 from app.paths import LOCAL_POLICY_STORAGE_ROOT
 
@@ -127,6 +128,23 @@ def _extract_policy_filename(chunk: RetrievedChunk) -> str | None:
     return None
 
 
+def _first_fact_value(facts: dict[str, list[PolicyFact]], key: str) -> str | None:
+    values = facts.get(key) or []
+    if not values:
+        return None
+    value = values[0].value.strip()
+    return value or None
+
+
+def _build_policy_prefill(chunks: list[RetrievedChunk]) -> dict[str, str | None]:
+    facts = extract_policy_facts(chunks)
+    return {
+        "policyholders": _first_fact_value(facts, "policyholders"),
+        "insurer": _first_fact_value(facts, "insurer"),
+        "policy_number": _first_fact_value(facts, "policy_number"),
+    }
+
+
 async def get_policy_status(case_id: str) -> dict[str, Any]:
     chunks = await list_policy_chunks(case_id, limit=None)
     if not chunks:
@@ -137,6 +155,11 @@ async def get_policy_status(case_id: str) -> dict[str, Any]:
             "source_label": None,
             "filename": None,
             "demo_policy": None,
+            "prefill": {
+                "policyholders": None,
+                "insurer": None,
+                "policy_number": None,
+            },
         }
 
     first = chunks[0]
@@ -153,6 +176,7 @@ async def get_policy_status(case_id: str) -> dict[str, Any]:
         "source_label": source_label,
         "filename": filename,
         "demo_policy": None if matched_seed is None else _serialize_seed(matched_seed),
+        "prefill": _build_policy_prefill(chunks),
     }
 
 

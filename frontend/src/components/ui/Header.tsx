@@ -20,12 +20,17 @@ export function Header() {
           ClaimMate
         </Link>
         {token && (
-          <button
-            onClick={handleLogout}
-            className="text-sm text-slate-500 hover:text-slate-900"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-4">
+            <Link href="/policy" className="text-sm font-medium text-slate-600 hover:text-blue-600">
+              Policy Q&A
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-slate-500 hover:text-slate-900"
+            >
+              Sign out
+            </button>
+          </div>
         )}
       </div>
     </header>

@@ -55,7 +55,10 @@ async def test_get_policy_status_matches_demo_policy_from_stored_chunks(monkeypa
             ),
             RetrievedChunk(
                 source_type="kb_a",
-                chunk_text="Page 2 policy text",
+                chunk_text=(
+                    "Policyholder(s) Anlan Cai Mingtao Ding Policy number 804 448 188 "
+                    "Underwritten by: Allstate Insurance Company Policyholders:"
+                ),
                 document_id="policy_pdf",
                 page_num=2,
                 section=None,
@@ -87,6 +90,11 @@ async def test_get_policy_status_matches_demo_policy_from_stored_chunks(monkeypa
                 "What should the insurer do within 15 days after receiving notice of claim?",
             ],
         },
+        "prefill": {
+            "policyholders": "Anlan Cai, Mingtao Ding",
+            "insurer": "Allstate Insurance Company",
+            "policy_number": "804 448 188",
+        },
     }
 
 
@@ -109,6 +117,11 @@ async def test_get_policy_status_returns_empty_state_when_case_has_no_chunks(mon
         "source_label": None,
         "filename": None,
         "demo_policy": None,
+        "prefill": {
+            "policyholders": None,
+            "insurer": None,
+            "policy_number": None,
+        },
     }
 
 

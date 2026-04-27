@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { getUserCases, deleteCase } from '@/lib/api'
 import { getCaseName, setCaseName, removeCaseName } from '@/lib/auth'
+import { isPolicyWorkspaceCaseId } from '@/lib/policyWorkspace'
 import { CaseCard } from '@/components/case/CaseCard'
 import { Button } from '@/components/ui/Button'
 
@@ -26,7 +27,11 @@ export default function CasesPage() {
     getUserCases()
       .then((entries) => {
         if (!active) return
-        setCases(entries.map((e) => ({ id: e.case_id, name: getCaseName(e.case_id) })))
+        setCases(
+          entries
+            .filter((e) => !isPolicyWorkspaceCaseId(e.case_id))
+            .map((e) => ({ id: e.case_id, name: getCaseName(e.case_id) }))
+        )
         setError('')
       })
       .catch((err) => {
@@ -51,7 +56,12 @@ export default function CasesPage() {
     <div className="mx-auto max-w-2xl px-4 py-10">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Your Cases</h1>
-        <Button onClick={() => router.push('/cases/new')}>+ New Case</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => router.push('/policy')}>
+            Policy Q&A
+          </Button>
+          <Button onClick={() => router.push('/cases/new')}>+ New Case</Button>
+        </div>
       </div>
       {error && (
         <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>

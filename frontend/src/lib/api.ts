@@ -49,6 +49,11 @@ export type CasePolicyStatusResponse = {
   source_label: string | null;
   filename: string | null;
   demo_policy?: DemoPolicy | null;
+  prefill?: {
+    policyholders: string | null;
+    insurer: string | null;
+    policy_number: string | null;
+  };
 };
 
 export type Citation = {
@@ -74,6 +79,24 @@ export type PartyComparisonRow = {
   other_party_value: string;
 };
 
+export type PartyRecord = {
+  role: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  insurer: string | null;
+  policy_number: string | null;
+  claim_number: string | null;
+};
+
+export type PhotoAttachment = {
+  photo_id: string;
+  category: string;
+  storage_key: string;
+  caption: string | null;
+  taken_at: string | null;
+};
+
 export type AccidentChatContext = {
   case_id: string;
   pinned_document_title: string;
@@ -87,11 +110,24 @@ export type AccidentChatContext = {
 export type AccidentReportPayload = {
   case_id: string;
   report_title: string;
+  generated_at: string;
   accident_summary: string;
+  occurrence_time: string | null;
   location_summary: string | null;
+  owner_party: PartyRecord | null;
+  other_party: PartyRecord | null;
   detailed_narrative: string;
   damage_summary: string | null;
+  injuries_reported: boolean | null;
+  police_called: boolean | null;
+  drivable: boolean | null;
+  tow_requested: boolean | null;
+  weather_conditions: string | null;
+  road_conditions: string | null;
   police_report_number: string | null;
+  adjuster_name: string | null;
+  repair_shop_name: string | null;
+  photo_attachments: PhotoAttachment[];
   timeline_entries: Array<{
     label: string;
     timestamp: string;
