@@ -69,11 +69,20 @@ export default function CasesPage() {
               generate a report, and collaborate in chat.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => router.push('/policy')}>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-stretch">
+            <Button
+              onClick={() => router.push('/cases/new')}
+              className="min-w-52 px-7 py-4 text-base shadow-2xl shadow-cyan-500/25"
+            >
+              + Start New Case
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => router.push('/policy')}
+              className="px-6 py-3"
+            >
               Policy Q&A
             </Button>
-            <Button onClick={() => router.push('/cases/new')}>+ New Case</Button>
           </div>
         </div>
       </div>
