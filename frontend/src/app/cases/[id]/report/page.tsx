@@ -81,7 +81,7 @@ export default function ReportPage() {
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">
-            Step 4: Accident Report
+            Step 3: Accident Report
           </h2>
           <p className="mt-1 text-sm text-slate-600">
             AI-generated summary of your accident details.

@@ -183,7 +183,7 @@ export default function StageAPage() {
       </div>
       <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-900">
-          Step 2: Accident Basics
+          Step 1: Accident Basics
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           Fill in what you have now — you can update anytime.

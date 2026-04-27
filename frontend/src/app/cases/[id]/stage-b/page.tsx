@@ -102,7 +102,7 @@ export default function StageBPage() {
       </div>
       <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-900">
-          Step 3: Accident Details
+          Step 2: Accident Details
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           Add more context and attach your policy once the urgent basics are saved.

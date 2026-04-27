@@ -183,7 +183,7 @@ export default function ChatPage() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">
-            Step 5: AI Chat
+            Step 4: AI Chat
           </h2>
           <p className="text-xs text-slate-500">
             Connection:{' '}

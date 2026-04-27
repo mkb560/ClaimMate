@@ -1,5 +1,4 @@
 const STEPS = ['Accident Basics', 'Accident Details', 'Report', 'Chat']
-const STEP_NUMBERS = [2, 3, 4, 5]
 
 export function StepIndicator({ current }: { current: number }) {
   return (
@@ -14,7 +13,7 @@ export function StepIndicator({ current }: { current: number }) {
                 ${i > current ? 'bg-slate-100 text-slate-500' : ''}
               `}
             >
-              {i < current ? '✓' : STEP_NUMBERS[i]}
+              {i < current ? '✓' : i + 1}
             </div>
             <span
               className={`hidden text-sm font-medium sm:block ${
