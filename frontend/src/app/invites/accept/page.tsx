@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { lookupInvite, acceptInvite, InviteLookupResponse } from '@/lib/api'
@@ -20,6 +20,7 @@ function AcceptInviteContent() {
   const [loading, setLoading] = useState(true)
   const [accepting, setAccepting] = useState(false)
   const [acceptError, setAcceptError] = useState('')
+  const autoAcceptedRef = useRef(false)
 
   useEffect(() => {
     if (!token) {
@@ -32,6 +33,14 @@ function AcceptInviteContent() {
       .catch((err) => setLookupError(err instanceof Error ? err.message : 'Invite not found.'))
       .finally(() => setLoading(false))
   }, [token])
+
+  // Auto-accept once user is logged in (e.g. returning from login/register redirect)
+  useEffect(() => {
+    if (!authToken || !invite || autoAcceptedRef.current) return
+    autoAcceptedRef.current = true
+    handleAccept()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken, invite])
 
   async function handleAccept() {
     setAccepting(true)
@@ -82,18 +91,21 @@ function AcceptInviteContent() {
                   Join Case
                 </Button>
               ) : (
-                <div className="space-y-2">
-                  <p className="text-sm text-slate-600">You need to log in first to join this case.</p>
+                <div className="space-y-3">
+                  <div className="rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    <p className="font-medium">Before joining</p>
+                    <p className="mt-0.5 text-blue-700">You&apos;ll need an account so your name shows correctly in the case chat.</p>
+                  </div>
                   <Button
                     className="w-full"
-                    onClick={() => router.push(`/register?next=/invites/accept?token=${encodeURIComponent(token)}`)}
+                    onClick={() => router.push(`/register?next=${encodeURIComponent(`/invites/accept?token=${token}`)}`)}
                   >
-                    Register &amp; Join
+                    Create account &amp; Join
                   </Button>
                   <Button
                     variant="secondary"
                     className="w-full"
-                    onClick={() => router.push(`/login?next=/invites/accept?token=${encodeURIComponent(token)}`)}
+                    onClick={() => router.push(`/login?next=${encodeURIComponent(`/invites/accept?token=${token}`)}`)}
                   >
                     Log in &amp; Join
                   </Button>

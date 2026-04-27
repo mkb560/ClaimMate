@@ -13,6 +13,7 @@ function RegisterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/cases'
+  const fromInvite = next.includes('/invites/accept')
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -43,17 +44,18 @@ function RegisterContent() {
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-slate-900">Create account</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Start managing your claim today
+            {fromInvite ? 'Set up your account to join the case' : 'Start managing your claim today'}
           </p>
         </div>
         <Card>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Name (optional)"
+              label={fromInvite ? 'Name (shown in case chat)' : 'Name (optional)'}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Your name"
               autoComplete="name"
+              required={fromInvite}
             />
             <Input
               label="Email"

@@ -118,10 +118,14 @@ async def case_chat_websocket(
                 else:
                     participants = [Participant(user_id="owner-1", role="owner")]
                 run_ai = bool(payload.get("run_ai", True))
+                sender_display_name: str | None = None
+                if ctx.user is not None:
+                    sender_display_name = ctx.user.display_name or ctx.user.email
                 out_event = {
                     "type": "user_message",
                     "case_id": normalized,
                     "sender_role": sender_role,
+                    "sender_display_name": sender_display_name,
                     "message_text": text,
                     "client_id": client_id,
                 }
@@ -133,6 +137,7 @@ async def case_chat_websocket(
                         ai_payload = await chat_event_dispatch(
                             normalized,
                             sender_role=sender_role,
+                            sender_display_name=sender_display_name,
                             message_text=text,
                             participants=participants,
                             invite_sent=invite_sent,

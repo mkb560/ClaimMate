@@ -6,6 +6,7 @@ export type WsMessage = {
   id: string
   type: 'user_message' | 'ai_message' | 'system' | 'ready' | 'pong' | 'error'
   sender_role?: string
+  sender_display_name?: string
   message_text?: string
   payload?: {
     text: string
@@ -29,7 +30,8 @@ const MAX_RETRIES = 5
 
 export function useWebSocketChat(
   caseId: string,
-  token: string | null
+  token: string | null,
+  senderRole: string = 'owner'
 ): {
   messages: WsMessage[]
   sendMessage: (text: string) => void
@@ -109,12 +111,12 @@ export function useWebSocketChat(
       JSON.stringify({
         type: 'chat',
         message_text: text,
-        sender_role: 'owner',
+        sender_role: senderRole,
         invite_sent: false,
         run_ai: true,
       })
     )
-  }, [])
+  }, [senderRole])
 
   return { messages, sendMessage, status }
 }

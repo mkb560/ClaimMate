@@ -375,8 +375,10 @@ export type ChatMessageRow = {
   case_id: string;
   message_type: "user" | "ai";
   sender_role: string | null;
+  sender_display_name: string | null;
   body_text: string;
   ai_payload: AIResponsePayload | null;
+  metadata: Record<string, unknown> | null;
   created_at: string;
 };
 

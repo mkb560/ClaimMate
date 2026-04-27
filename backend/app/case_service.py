@@ -199,14 +199,16 @@ async def get_stored_chat_context(case_id: str) -> dict[str, Any] | None:
 
 
 def _serialize_chat_message_row(row: CaseChatMessageRow) -> dict[str, Any]:
+    meta = row.metadata_json or {}
     return {
         "id": str(row.id),
         "case_id": row.case_id,
         "sender_role": row.sender_role,
+        "sender_display_name": meta.get("sender_display_name"),
         "message_type": row.message_type,
         "body_text": row.body_text,
         "ai_payload": row.ai_payload,
-        "metadata": row.metadata_json,
+        "metadata": meta,
         "created_at": _jsonable(row.created_at),
     }
 
@@ -216,10 +218,14 @@ async def append_chat_user_message(
     sender_role: str,
     message_text: str,
     *,
+    sender_display_name: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     sessionmaker = get_sessionmaker()
     now = _utcnow()
+    merged_meta: dict[str, Any] = dict(metadata or {})
+    if sender_display_name:
+        merged_meta["sender_display_name"] = sender_display_name
     async with sessionmaker() as session:
         await _require_case(session, case_id)
         row = CaseChatMessageRow(
@@ -228,7 +234,7 @@ async def append_chat_user_message(
             message_type="user",
             body_text=message_text,
             ai_payload=None,
-            metadata_json=metadata,
+            metadata_json=merged_meta or None,
             created_at=now,
         )
         session.add(row)

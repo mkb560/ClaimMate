@@ -13,6 +13,7 @@ async def chat_event_dispatch(
     case_id: str,
     *,
     sender_role: str,
+    sender_display_name: str | None = None,
     message_text: str,
     participants: list[Participant],
     invite_sent: bool,
@@ -46,6 +47,7 @@ async def chat_event_dispatch(
             case_id,
             sender_role,
             message_text.strip(),
+            sender_display_name=sender_display_name,
             metadata=merged_meta,
         )
     response = await handle_chat_event(event)

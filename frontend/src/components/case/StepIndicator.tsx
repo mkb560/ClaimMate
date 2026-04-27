@@ -1,4 +1,4 @@
-const STEPS = ['Policy', 'Stage A', 'Stage B', 'Report', 'Chat']
+const STEPS = ['Policy', 'Accident Basics', 'Accident Details', 'Report', 'Chat']
 
 export function StepIndicator({ current }: { current: number }) {
   return (

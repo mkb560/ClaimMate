@@ -13,10 +13,12 @@ import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 
 function resolveSenderName(
+  storedDisplayName: string | null | undefined,
   senderRole: string | null | undefined,
   user: AuthUser | null,
   currentRole: string | null
 ): string {
+  if (storedDisplayName) return storedDisplayName
   if (!senderRole) return 'User'
   if (senderRole === currentRole && user) {
     return user.display_name || user.email
@@ -32,7 +34,7 @@ function rowToDisplay(row: ChatMessageRow, user: AuthUser | null, currentRole: s
     citations: row.ai_payload?.citations,
     senderName: row.message_type === 'ai'
       ? 'ClaimMate'
-      : resolveSenderName(row.sender_role, user, currentRole),
+      : resolveSenderName(row.sender_display_name, row.sender_role, user, currentRole),
   }
 }
 
@@ -42,7 +44,7 @@ function wsToDisplay(msg: WsMessage, user: AuthUser | null, currentRole: string 
       id: msg.id,
       role: 'user',
       text: msg.message_text || '',
-      senderName: resolveSenderName(msg.sender_role, user, currentRole),
+      senderName: resolveSenderName(msg.sender_display_name, msg.sender_role, user, currentRole),
     }
   }
   if (msg.type === 'ai_message' && msg.payload) {
@@ -75,7 +77,8 @@ export default function ChatPage() {
   const [copied, setCopied] = useState(false)
   const { messages: wsMessages, sendMessage, status } = useWebSocketChat(
     caseId,
-    token
+    token,
+    role ?? 'owner'
   )
 
   useEffect(() => {
