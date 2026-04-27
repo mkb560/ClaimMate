@@ -290,7 +290,7 @@ export async function seedDemoPolicy(caseId: string, policyKey?: string) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => null);
-    throw new Error(error?.detail || "Seed demo policy failed");
+    throw new Error(error?.detail || "Load existing policy failed");
   }
 
   return (await response.json()) as SeedDemoPolicyResponse;
