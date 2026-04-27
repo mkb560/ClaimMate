@@ -53,6 +53,7 @@ export function CaseCard({ caseId, name, onDelete, onRename }: CaseCardProps) {
           </button>
         )}
         <p className="text-xs text-slate-400">{caseId}</p>
+        <p className="text-[11px] text-slate-400">Click the name to rename.</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Button
