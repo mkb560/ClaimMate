@@ -28,6 +28,31 @@ function firstUsefulSummary(summary: string): string {
     .trim()
 }
 
+function normalizePartyRows(r: GenerateReportResponse['report_payload']) {
+  const rows = (r.party_comparison_rows || []).filter(
+    (row) => !['Claim number', 'Vehicle'].includes(row.field_label)
+  )
+  const labels = new Set(rows.map((row) => row.field_label))
+
+  if (!labels.has('VIN')) {
+    rows.push({
+      field_label: 'VIN',
+      owner_value: r.owner_party?.vehicle?.vin || 'Unknown',
+      other_party_value: r.other_party?.vehicle?.vin || 'Unknown',
+    })
+  }
+
+  if (!labels.has('Plate number')) {
+    rows.push({
+      field_label: 'Plate number',
+      owner_value: r.owner_party?.vehicle?.license_plate || 'Unknown',
+      other_party_value: r.other_party?.vehicle?.license_plate || 'Unknown',
+    })
+  }
+
+  return rows
+}
+
 function FactCard({
   label,
   value,
@@ -67,6 +92,7 @@ export function ReportView({ report }: { report: GenerateReportResponse }) {
   const summary = r.damage_summary || firstUsefulSummary(r.accident_summary)
   const ownerName = r.owner_party?.name || 'Owner'
   const otherName = r.other_party?.name || 'Other party'
+  const partyRows = normalizePartyRows(r)
 
   return (
     <div className="space-y-5">
@@ -100,8 +126,8 @@ export function ReportView({ report }: { report: GenerateReportResponse }) {
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <Section title="People & Insurance">
-          {r.party_comparison_rows?.length ? (
-            <PartyTable rows={r.party_comparison_rows} />
+          {partyRows.length ? (
+            <PartyTable rows={partyRows} />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               <FactCard label="Owner" value={ownerName} />

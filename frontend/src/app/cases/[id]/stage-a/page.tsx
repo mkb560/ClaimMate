@@ -63,6 +63,8 @@ function buildInitialStageA(
   const loc = (a.location as Record<string, unknown>) || {}
   const own = (a.owner_party as Record<string, unknown>) || {}
   const oth = (a.other_party as Record<string, unknown>) || {}
+  const ownVehicle = (own.vehicle as Record<string, unknown>) || {}
+  const othVehicle = (oth.vehicle as Record<string, unknown>) || {}
   const ownerName = textValue(own.name) || userDisplayName(user) || firstPolicyholder(prefill)
 
   return {
@@ -73,10 +75,14 @@ function buildInitialStageA(
     owner_phone: textValue(own.phone),
     owner_insurer: textValue(own.insurer) || textValue(prefill?.insurer),
     owner_policy_number: textValue(own.policy_number) || textValue(prefill?.policy_number),
+    owner_vin: textValue(ownVehicle.vin),
+    owner_plate_number: textValue(ownVehicle.license_plate),
     other_name: textValue(oth.name),
     other_phone: textValue(oth.phone),
     other_insurer: textValue(oth.insurer),
     other_policy_number: textValue(oth.policy_number),
+    other_vin: textValue(othVehicle.vin),
+    other_plate_number: textValue(othVehicle.license_plate),
     injuries_reported: boolToTriState(a.injuries_reported),
     police_called: boolToTriState(a.police_called),
     drivable: boolToTriState(a.drivable),
@@ -143,6 +149,10 @@ export default function StageAPage() {
           phone: data.owner_phone || null,
           insurer: data.owner_insurer || null,
           policy_number: data.owner_policy_number || null,
+          vehicle: {
+            vin: data.owner_vin || null,
+            license_plate: data.owner_plate_number || null,
+          },
         },
         other_party: {
           role: 'other_driver',
@@ -150,6 +160,10 @@ export default function StageAPage() {
           phone: data.other_phone || null,
           insurer: data.other_insurer || null,
           policy_number: data.other_policy_number || null,
+          vehicle: {
+            vin: data.other_vin || null,
+            license_plate: data.other_plate_number || null,
+          },
         },
         injuries_reported: triStateToBool(data.injuries_reported),
         police_called: triStateToBool(data.police_called),

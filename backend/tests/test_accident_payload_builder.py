@@ -28,7 +28,14 @@ def test_build_accident_report_payload_merges_stage_inputs() -> None:
             phone="213-555-0100",
             insurer="Allstate",
             policy_number="804 448 188",
-            vehicle=VehicleRecord(year=2022, make="Tesla", model="Model 3", color="Blue", license_plate="8ABC123"),
+            vehicle=VehicleRecord(
+                year=2022,
+                make="Tesla",
+                model="Model 3",
+                color="Blue",
+                license_plate="8ABC123",
+                vin="5YJ3E1EA7NF123456",
+            ),
         ),
         other_party=PartyRecord(
             role=PartyRole.OTHER_DRIVER,
@@ -37,7 +44,14 @@ def test_build_accident_report_payload_merges_stage_inputs() -> None:
             insurer="Progressive",
             policy_number="P-7788",
             claim_number="CLM-22",
-            vehicle=VehicleRecord(year=2021, make="Toyota", model="Camry", color="White", license_plate="9XYZ999"),
+            vehicle=VehicleRecord(
+                year=2021,
+                make="Toyota",
+                model="Camry",
+                color="White",
+                license_plate="9XYZ999",
+                vin="4T1C11AK1MU123456",
+            ),
         ),
         injuries_reported=False,
         police_called=True,
@@ -87,6 +101,16 @@ def test_build_accident_report_payload_merges_stage_inputs() -> None:
     assert len(report.photo_attachments) == 2
     assert report.party_comparison_rows[0].owner_value == "Mingtao Ding"
     assert report.party_comparison_rows[0].other_party_value == "Alex Kim"
+    assert [row.field_label for row in report.party_comparison_rows] == [
+        "Party name",
+        "Phone",
+        "Insurer",
+        "Policy number",
+        "VIN",
+        "Plate number",
+    ]
+    assert report.party_comparison_rows[4].owner_value == "5YJ3E1EA7NF123456"
+    assert report.party_comparison_rows[5].other_party_value == "9XYZ999"
     assert [entry.label for entry in report.timeline_entries] == [
         "Accident occurred",
         "Stage A completed",
@@ -111,6 +135,7 @@ def test_build_accident_chat_context_exposes_follow_up_items_for_incomplete_case
     assert any("Location" not in fact for fact in chat_context.key_facts)
     assert "Stage B home follow-up details have not been completed yet." in chat_context.follow_up_items
     assert "Other party information is incomplete." in chat_context.follow_up_items
+    assert not any("Witness or injury follow-up" in item for item in chat_context.follow_up_items)
 
 
 def test_build_accident_report_payload_uses_none_for_missing_location_summary() -> None:

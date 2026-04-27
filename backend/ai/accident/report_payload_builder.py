@@ -47,6 +47,16 @@ def _format_vehicle(vehicle: VehicleRecord | None) -> str:
     return base
 
 
+def _format_vehicle_field(party: PartyRecord | None, selector: str) -> str:
+    if party is None or party.vehicle is None:
+        return "Unknown"
+    if selector == "vin":
+        return _clean_text(party.vehicle.vin) or "Unknown"
+    if selector == "license_plate":
+        return _clean_text(party.vehicle.license_plate) or "Unknown"
+    raise ValueError(f"Unsupported vehicle selector: {selector}")
+
+
 def _format_party_value(party: PartyRecord | None, selector: str) -> str:
     if party is None:
         return "Unknown"
@@ -63,6 +73,8 @@ def _format_party_value(party: PartyRecord | None, selector: str) -> str:
         return _clean_text(party.claim_number) or "Unknown"
     if selector == "vehicle":
         return _format_vehicle(party.vehicle)
+    if selector in {"vin", "license_plate"}:
+        return _format_vehicle_field(party, selector)
     raise ValueError(f"Unsupported selector: {selector}")
 
 
@@ -126,8 +138,8 @@ def _build_party_comparison(stage_a: StageAAccidentIntake) -> list[PartyComparis
         ("Phone", "phone"),
         ("Insurer", "insurer"),
         ("Policy number", "policy_number"),
-        ("Claim number", "claim_number"),
-        ("Vehicle", "vehicle"),
+        ("VIN", "vin"),
+        ("Plate number", "license_plate"),
     ):
         rows.append(
             PartyComparisonRow(
@@ -179,9 +191,6 @@ def _build_missing_items(stage_a: StageAAccidentIntake, stage_b: StageBAccidentI
 
     if stage_a.police_called and _clean_text(stage_b.police_report_number) is None:
         missing.append("Police report number is missing.")
-
-    if stage_a.injuries_reported and not stage_b.witness_contacts:
-        missing.append("Witness or injury follow-up notes are still missing.")
 
     return missing
 

@@ -87,6 +87,10 @@ export type PartyRecord = {
   insurer: string | null;
   policy_number: string | null;
   claim_number: string | null;
+  vehicle: {
+    license_plate: string | null;
+    vin: string | null;
+  } | null;
 };
 
 export type PhotoAttachment = {

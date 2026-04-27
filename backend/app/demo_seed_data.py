@@ -45,6 +45,7 @@ def build_demo_stage_a_payload(*, now: datetime | None = None) -> dict[str, Any]
                 "model": "Elantra",
                 "color": "Silver",
                 "license_plate": "9ABC123",
+                "vin": "KMHLN4DJ8RU107842",
             },
         },
         "other_party": {
@@ -61,6 +62,7 @@ def build_demo_stage_a_payload(*, now: datetime | None = None) -> dict[str, Any]
                 "model": "RAV4",
                 "color": "Blue",
                 "license_plate": "8XYZ552",
+                "vin": "2T3P1RFV8NW123456",
             },
         },
         "injuries_reported": False,

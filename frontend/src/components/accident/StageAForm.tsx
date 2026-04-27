@@ -17,10 +17,14 @@ export type StageAData = {
   owner_phone: string
   owner_insurer: string
   owner_policy_number: string
+  owner_vin: string
+  owner_plate_number: string
   other_name: string
   other_phone: string
   other_insurer: string
   other_policy_number: string
+  other_vin: string
+  other_plate_number: string
   injuries_reported: TriState
   police_called: TriState
   drivable: TriState
@@ -35,10 +39,14 @@ export const EMPTY_STAGE_A: StageAData = {
   owner_phone: '',
   owner_insurer: '',
   owner_policy_number: '',
+  owner_vin: '',
+  owner_plate_number: '',
   other_name: '',
   other_phone: '',
   other_insurer: '',
   other_policy_number: '',
+  other_vin: '',
+  other_plate_number: '',
   injuries_reported: 'unknown',
   police_called: 'unknown',
   drivable: 'unknown',
@@ -165,6 +173,18 @@ export function StageAForm({
               value={form.owner_policy_number}
               onChange={(e) => set('owner_policy_number', e.target.value)}
             />
+            <Input
+              label="VIN"
+              value={form.owner_vin}
+              onChange={(e) => set('owner_vin', e.target.value)}
+              placeholder="17-character VIN"
+            />
+            <Input
+              label="Plate number"
+              value={form.owner_plate_number}
+              onChange={(e) => set('owner_plate_number', e.target.value)}
+              placeholder="ABC1234"
+            />
           </div>
         </Card>
         <Card>
@@ -192,6 +212,18 @@ export function StageAForm({
               label="Policy #"
               value={form.other_policy_number}
               onChange={(e) => set('other_policy_number', e.target.value)}
+            />
+            <Input
+              label="VIN"
+              value={form.other_vin}
+              onChange={(e) => set('other_vin', e.target.value)}
+              placeholder="17-character VIN"
+            />
+            <Input
+              label="Plate number"
+              value={form.other_plate_number}
+              onChange={(e) => set('other_plate_number', e.target.value)}
+              placeholder="ABC1234"
             />
           </div>
         </Card>
