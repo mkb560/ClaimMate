@@ -8,6 +8,7 @@ import { getCaseName, setCaseName, removeCaseName } from '@/lib/auth'
 import { isPolicyWorkspaceCaseId } from '@/lib/policyWorkspace'
 import { CaseCard } from '@/components/case/CaseCard'
 import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
 
 type CaseItem = { id: string; name: string }
 
@@ -53,26 +54,42 @@ export default function CasesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Your Cases</h1>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => router.push('/policy')}>
-            Policy Q&A
-          </Button>
-          <Button onClick={() => router.push('/cases/new')}>+ New Case</Button>
+    <div className="mx-auto max-w-4xl px-4 py-10">
+      <div className="mb-6 overflow-hidden rounded-[2rem] border border-white/70 bg-gradient-to-br from-slate-950 via-blue-950 to-cyan-800 p-8 text-white shadow-[0_24px_70px_rgba(15,23,42,0.22)]">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">
+              ClaimMate workspace
+            </p>
+            <h1 className="mt-3 text-3xl font-black tracking-tight">
+              Your Cases
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">
+              Start the accident intake immediately, then add policy materials,
+              generate a report, and collaborate in chat.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => router.push('/policy')}>
+              Policy Q&A
+            </Button>
+            <Button onClick={() => router.push('/cases/new')}>+ New Case</Button>
+          </div>
         </div>
       </div>
       {error && (
         <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
       {loading ? null : cases.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-slate-200 px-6 py-16 text-center">
-          <p className="text-slate-600">No cases yet.</p>
+        <Card className="border-dashed py-16 text-center">
+          <p className="text-lg font-semibold text-slate-900">No cases yet.</p>
+          <p className="mt-2 text-sm text-slate-600">
+            Create one and ClaimMate will open Accident Basics right away.
+          </p>
           <Button className="mt-4" onClick={() => router.push('/cases/new')}>
             Start your first case
           </Button>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-3">
           {cases.map((entry) => (

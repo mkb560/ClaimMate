@@ -14,8 +14,8 @@ export default function CaseLayout({
   const currentStep = STEP_PATHS.findIndex((p) => pathname.endsWith(p))
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-3xl px-4 py-6">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-5xl px-4 py-8">
         <StepIndicator current={currentStep >= 0 ? currentStep : 0} />
         <div className="mt-6">{children}</div>
       </div>
