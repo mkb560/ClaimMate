@@ -81,15 +81,15 @@ export default function StandalonePolicyPage() {
           Ask questions about your insurance policy
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-          This is a standalone policy workspace. Upload a policy or use a demo
-          policy, then ask coverage and policy fact questions without starting
+          This is a standalone policy workspace. Upload a policy or choose an
+          existing policy, then ask coverage and policy fact questions without starting
           an accident case.
         </p>
       </div>
       <PolicyWorkspace
         caseId={policyCaseId}
         title="Your Policy"
-        intro="Upload your policy PDF or choose a demo policy to start asking questions."
+        intro="Upload your policy PDF or choose an existing policy to start asking questions."
         backHref="/cases"
         backLabel="Back to Cases"
       />

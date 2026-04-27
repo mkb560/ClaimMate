@@ -24,9 +24,9 @@ export function DemoPolicyPicker({
 
   return (
     <Card>
-      <h3 className="font-semibold text-slate-900">Choose a Demo Policy</h3>
+      <h3 className="font-semibold text-slate-900">Choose an Existing Policy</h3>
       <p className="mt-1 text-sm text-slate-600">
-        Pick one of our sample policies to get started instantly.
+        Select one of the prepared policy documents to get started instantly.
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         {policies.map((p) => (

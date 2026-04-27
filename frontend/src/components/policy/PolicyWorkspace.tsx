@@ -34,7 +34,7 @@ export function PolicyWorkspace({
   caseId,
   canEdit = true,
   title = 'Step 1: Your Policy',
-  intro = 'Upload your policy PDF or choose a demo to get started.',
+  intro = 'Upload your policy PDF or choose an existing policy to get started.',
   backHref,
   backLabel = 'Back',
   nextHref,

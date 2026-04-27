@@ -113,7 +113,7 @@ export default function StageBPage() {
           caseId={caseId}
           canEdit={isOwner}
           title="Policy & Coverage Materials"
-          intro="Choose a demo policy or upload your own PDF here. ClaimMate can use it later for coverage questions and claim support."
+          intro="Choose an existing policy or upload your own PDF here. ClaimMate can use it later for coverage questions and claim support."
           showAskPanel={false}
         />
       </div>
