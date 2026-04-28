@@ -5,12 +5,12 @@ This file gives coding agents the current source of truth for this repository.
 ## Repository Status
 
 - As of 2026-03-29, this directory is an active Git repository cloned from GitHub.
-- The actual codebase in this repo now includes the **AI/backend scaffold plus a minimal Next.js demo frontend** under `frontend/`.
+- The actual codebase in this repo now includes the **AI/backend scaffold, a Next.js web frontend** under `frontend/`, and an Android-only Expo React Native app under `mobile/`.
 - The repository root also contains the curated `claimmate_rag_docs/` directory for local KB-B indexing.
 - The repository root also contains `demo_policy_pdfs/` with sample real policy PDFs for KB-A/demo use; keep these separate from `claimmate_rag_docs/` so they are not indexed as KB-B.
 - Project-facing Markdown docs now live under `docs/` except for this `AGENTS.md` file.
 - The FastAPI app now includes routed health, policy upload/ask, case creation, accident workflow, claim-date, and chat-event endpoints.
-- The repository now contains both reusable AI modules and a lightweight app-layer integration under `backend/app/`.
+- The repository now contains reusable AI modules, a lightweight app-layer integration under `backend/app/`, web UI code under `frontend/`, and mobile UI code under `mobile/`.
 
 ## Product Context
 
@@ -77,9 +77,16 @@ backend/
   - `demo_policy_service.py` provides the stable mapping from demo policy keys and fixed demo case ids to local PDF copies + KB-A ingestion, plus read helpers for demo policy catalog and indexed policy status
 
 - `frontend/`
-  - Minimal Next.js demo UI used for teammate integration and class demos
-  - `src/lib/api.ts` wraps shared backend calls for health, policy upload/ask, case snapshot, accident report generation, and chat event demo calls
-  - `src/app/page.tsx` currently demonstrates both policy Q&A and accident/chat preview flows against one shared backend
+  - Next.js web UI used for teammate integration and class demos
+  - Includes auth, case list, fast case creation, accident Stage A/B forms, standalone Policy Q&A, report preview, incident photo upload, invite handling, and WebSocket chat
+  - `src/lib/api.ts` wraps shared backend calls for health, auth, case CRUD, policy upload/ask, accident report generation, photos, invites, chat messages, and WebSocket setup
+
+- `mobile/`
+  - Android-only Expo React Native app for course/demo APK delivery
+  - Uses Expo Router, TypeScript, native React Native components, `expo-secure-store` for JWT storage, `expo-document-picker` for policy PDFs, `expo-image-picker` for camera/gallery incident photos, and native WebSocket chat
+  - Talks to the same Railway/FastAPI backend without backend API changes
+  - Core screens include login/register, case list, standalone Policy Q&A, invite accept, Accident Basics, Accident Details, Report, and Chat
+  - `mobile/eas.json` includes a `preview` profile that builds an installable Android APK through EAS
 
 - `backend/ai/config.py`
   - Centralized environment-based configuration using `pydantic-settings`
@@ -221,6 +228,14 @@ backend/
 - Reminder cooldown is controlled by `last_deadline_alert_at`
 - Explicit deadline questions do not update the fallback reminder cooldown; they return an informational explainer with `metadata.deadline_intent = "explainer"`
 
+### Android mobile app
+
+- The mobile app lives in `mobile/` and is separate from the Next.js web app.
+- It reuses the same backend contracts instead of introducing mobile-specific backend routes.
+- The default API base URL is the Railway backend; local Android emulator testing can override it with `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8000`.
+- The mobile app is Android-only for now. Do not add iOS work unless explicitly requested.
+- Expo/EAS build requires an Expo account login before running `npm run build:android`.
+
 ## Important Integration Contracts
 
 ### Database / engine wiring
@@ -256,7 +271,7 @@ Do **not** assume the following already exist in this repo:
 - PDF report generation pipeline
 - shared SQLAlchemy ORM for application tables
 - database migrations
-- deployment config for Railway or Vercel
+- Play Store release configuration for Android
 
 If you mention those systems, clearly label them as planned integration targets unless you actually add them.
 
@@ -273,6 +288,25 @@ DATABASE_URL=postgresql+psycopg://... ./.venv/bin/python scripts/index_local_kb_
 DATABASE_URL=postgresql+psycopg://... ./.venv/bin/python scripts/query_local_rag.py "What is the 15-day claim acknowledgment rule?"
 DATABASE_URL=postgresql+psycopg://... ./.venv/bin/python scripts/seed_demo_policy.py --case-id allstate-change-2025-05
 ./.venv/bin/python scripts/run_demo_smoke.py --base-url http://127.0.0.1:8000
+```
+
+Mobile app checks:
+
+```bash
+cd mobile
+npm install
+npm run lint
+npm run typecheck
+EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir /tmp/claimmate-mobile-export
+```
+
+Android APK build:
+
+```bash
+cd mobile
+npx eas login
+npx eas init
+npm run build:android
 ```
 
 If `.venv` does not exist yet:
@@ -326,6 +360,7 @@ When this project is moved onto GitHub, use the repository root as the Git root.
 - **Mingtao:** `backend/ai/`, `backend/models/ai_types.py`, AI integration contracts
 - **Ke Wu:** product-layer FastAPI routes, shared DB models, auth, Stripe, deployment, app-layer chat backend
 - **Yi-Hsien Lou:** frontend UI, accident form, generated report UX, Figma-to-code handoff assets
+- **Android/mobile:** `mobile/` is currently a separate Expo React Native client that should follow existing backend contracts and avoid backend API drift
 
 ### Recommended workflow
 
@@ -356,4 +391,5 @@ When this project is moved onto GitHub, use the repository root as the Git root.
 - Do not describe this repository as a complete full-stack app unless that code has been added
 - Prefer updating tests when changing AI orchestration or parsing behavior
 - After modifying backend code, run `./.venv/bin/pytest`
+- After modifying mobile code, run `cd mobile && npm run lint && npm run typecheck`; for bundle-level validation also run `EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir /tmp/claimmate-mobile-export`
 - If you add new app-layer routes or integrations, also update this file so the next agent sees the real repo state
