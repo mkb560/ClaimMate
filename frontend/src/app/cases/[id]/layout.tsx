@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { useParams, usePathname } from 'next/navigation'
 import { StepIndicator } from '@/components/case/StepIndicator'
 
 const STEP_PATHS = ['stage-a', 'stage-b', 'report', 'chat']
@@ -10,13 +10,17 @@ export default function CaseLayout({
 }: {
   children: React.ReactNode
 }) {
+  const params = useParams<{ id: string }>()
   const pathname = usePathname()
   const currentStep = STEP_PATHS.findIndex((p) => pathname.endsWith(p))
 
   return (
     <div className="min-h-screen">
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <StepIndicator current={currentStep >= 0 ? currentStep : 0} />
+        <StepIndicator
+          caseId={params.id}
+          current={currentStep >= 0 ? currentStep : 0}
+        />
         <div className="mt-6">{children}</div>
       </div>
     </div>
