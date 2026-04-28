@@ -26,6 +26,9 @@
       "apiBaseUrl": "https://claimmate-backend-production.up.railway.app",
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "78a72370-b734-407c-9a1b-0ba66c5035b5"
       }
     },
     "android": {
@@ -34,10 +37,12 @@
         "backgroundColor": "#0f63ff"
       },
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE"
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ]
-    }
+    },
+    "owner": "mding386"
   }
 }
