@@ -1,24 +1,24 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '@/auth/AuthContext';
 import { createCase, deleteCase, getUserCases, UserCaseEntry } from '@/api/client';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Loading } from '@/components/Loading';
 import { Screen } from '@/components/Screen';
 import { colors, radius, spacing } from '@/theme/theme';
+import { defaultCaseName, getCaseName, removeCaseName, setCaseName } from '@/utils/caseNames';
 import { isPolicyWorkspaceCaseId } from '@/utils/policyWorkspace';
 
-function caseTitle(caseId: string): string {
-  const suffix = caseId.replace(/^case-/, '').slice(0, 8).toUpperCase();
-  return `Accident case ${suffix}`;
-}
-
 export default function CasesScreen() {
-  const { token, user, logout } = useAuth();
+  const { token, user } = useAuth();
   const [cases, setCases] = useState<UserCaseEntry[]>([]);
+  const [caseNames, setCaseNames] = useState<Record<string, string>>({});
+  const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -32,7 +32,12 @@ export default function CasesScreen() {
     setError('');
     try {
       const entries = await getUserCases();
-      setCases(entries.filter((entry) => !isPolicyWorkspaceCaseId(entry.case_id)));
+      const visibleEntries = entries.filter((entry) => !isPolicyWorkspaceCaseId(entry.case_id));
+      setCases(visibleEntries);
+      const storedNames = await Promise.all(
+        visibleEntries.map(async (entry) => [entry.case_id, await getCaseName(entry.case_id)] as const)
+      );
+      setCaseNames(Object.fromEntries(storedNames.filter(([, name]) => Boolean(name))) as Record<string, string>);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load cases');
     } finally {
@@ -65,16 +70,41 @@ export default function CasesScreen() {
         style: 'destructive',
         onPress: async () => {
           await deleteCase(caseId).catch(() => undefined);
+          await removeCaseName(caseId).catch(() => undefined);
           setCases((prev) => prev.filter((item) => item.case_id !== caseId));
+          setCaseNames((prev) => {
+            const next = { ...prev };
+            delete next[caseId];
+            return next;
+          });
         },
       },
     ]);
+  }
+
+  function displayName(caseId: string): string {
+    return caseNames[caseId] || defaultCaseName(caseId);
+  }
+
+  function startRename(caseId: string) {
+    setEditingCaseId(caseId);
+    setDraftName(displayName(caseId));
+  }
+
+  async function saveRename(caseId: string) {
+    const nextName = draftName.trim();
+    if (!nextName) return;
+    await setCaseName(caseId, nextName);
+    setCaseNames((prev) => ({ ...prev, [caseId]: nextName }));
+    setEditingCaseId(null);
+    setDraftName('');
   }
 
   if (loading) return <Loading />;
 
   return (
     <Screen>
+      <AppHeader />
       <View style={styles.hero}>
         <Text style={styles.kicker}>ClaimMate workspace</Text>
         <Text style={styles.title}>Your Cases</Text>
@@ -83,13 +113,11 @@ export default function CasesScreen() {
         </Text>
         <View style={styles.heroActions}>
           <Button title="+ Start New Case" onPress={startCase} loading={creating} style={styles.primaryCta} />
-          <Button title="Policy Q&A" variant="secondary" onPress={() => router.push('/policy')} />
         </View>
       </View>
 
       <View style={styles.topRow}>
         <Text style={styles.signedIn}>Signed in as {user?.display_name || user?.email}</Text>
-        <Button title="Sign out" variant="ghost" onPress={() => logout().then(() => router.replace('/auth/login'))} />
       </View>
 
       <ErrorBanner message={error} />
@@ -103,13 +131,34 @@ export default function CasesScreen() {
         cases.map((entry) => (
           <Card key={entry.case_id} style={styles.caseCard}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.caseTitle}>{caseTitle(entry.case_id)}</Text>
+              {editingCaseId === entry.case_id ? (
+                <TextInput
+                  autoFocus
+                  value={draftName}
+                  onChangeText={setDraftName}
+                  placeholder="Case name"
+                  placeholderTextColor="#94a3b8"
+                  style={styles.caseNameInput}
+                />
+              ) : (
+                <Text style={styles.caseTitle}>{displayName(entry.case_id)}</Text>
+              )}
               <Text style={styles.caseId}>{entry.case_id}</Text>
               <Text style={styles.role}>Role: {entry.role}</Text>
             </View>
             <View style={styles.caseActions}>
-              <Button title="Open" onPress={() => router.push(`/cases/${entry.case_id}/stage-a`)} />
-              <Button title="Delete" variant="danger" onPress={() => confirmDelete(entry.case_id)} />
+              {editingCaseId === entry.case_id ? (
+                <>
+                  <Button title="Save" onPress={() => saveRename(entry.case_id)} />
+                  <Button title="Cancel" variant="secondary" onPress={() => setEditingCaseId(null)} />
+                </>
+              ) : (
+                <>
+                  <Button title="Open" onPress={() => router.push(`/cases/${entry.case_id}/stage-a`)} />
+                  <Button title="Rename" variant="secondary" onPress={() => startRename(entry.case_id)} />
+                  <Button title="Delete" variant="danger" onPress={() => confirmDelete(entry.case_id)} />
+                </>
+              )}
             </View>
           </Card>
         ))
@@ -177,6 +226,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  caseNameInput: {
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   caseTitle: {
     color: colors.text,

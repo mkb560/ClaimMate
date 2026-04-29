@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { acceptInvite, lookupInvite } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { ErrorBanner } from '@/components/ErrorBanner';
@@ -61,6 +62,7 @@ export default function InviteAcceptScreen() {
 
   return (
     <Screen contentStyle={styles.content}>
+      <AppHeader />
       <Card style={styles.card}>
         <Text style={styles.title}>Join ClaimMate Case</Text>
         <Text style={styles.body}>You were invited to join case {caseId || 'unknown'} as {role || 'member'}.</Text>

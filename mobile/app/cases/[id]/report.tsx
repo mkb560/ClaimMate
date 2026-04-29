@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { generateAccidentReport, GenerateReportResponse, getAccidentReport } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { CaseStepper } from '@/components/CaseStepper';
@@ -70,6 +71,7 @@ export default function ReportScreen() {
 
   return (
     <Screen>
+      <AppHeader />
       <CaseStepper caseId={caseId} current={2} />
       <Button title="Back" variant="ghost" onPress={() => router.push(`/cases/${caseId}/stage-b`)} />
       <View style={styles.headerRow}>

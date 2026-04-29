@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { createCase } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Loading } from '@/components/Loading';
@@ -48,6 +49,7 @@ export default function PolicyScreen() {
 
   return (
     <Screen>
+      <AppHeader />
       <Button title="Back to Cases" variant="ghost" onPress={() => router.push('/cases')} />
       <Text style={styles.kicker}>Policy Q&A</Text>
       <Text style={styles.title}>Ask questions about your insurance policy</Text>

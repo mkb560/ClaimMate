@@ -10,6 +10,7 @@ import {
   uploadIncidentPhoto,
 } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { CaseStepper } from '@/components/CaseStepper';
@@ -245,6 +246,7 @@ export default function StageAScreen() {
 
   return (
     <Screen>
+      <AppHeader />
       <CaseStepper caseId={caseId} current={0} />
       <Button title="Back to Cases" variant="ghost" onPress={() => router.push('/cases')} />
       <Text style={styles.title}>Step 1: Accident Basics</Text>

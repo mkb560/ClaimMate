@@ -10,6 +10,7 @@ import {
   getChatMessages,
 } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { CaseStepper } from '@/components/CaseStepper';
@@ -157,6 +158,7 @@ export default function ChatScreen() {
   return (
     <Screen scroll={false}>
       <View style={styles.container}>
+        <AppHeader />
         <CaseStepper caseId={caseId} current={3} />
         <View style={styles.header}>
           <View>

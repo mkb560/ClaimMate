@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { getCaseSnapshot, patchAccidentStageB } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
+import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { CaseStepper } from '@/components/CaseStepper';
@@ -92,6 +93,7 @@ export default function StageBScreen() {
 
   return (
     <Screen>
+      <AppHeader />
       <CaseStepper caseId={caseId} current={1} />
       <Button title="Back" variant="ghost" onPress={() => router.push(`/cases/${caseId}/stage-a`)} />
       <Text style={styles.title}>Step 2: Accident Details</Text>
