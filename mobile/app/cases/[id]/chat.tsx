@@ -1,7 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   CaseMemberEntry,
   ChatMessageRow,
@@ -173,7 +173,11 @@ export default function ChatScreen() {
             <Button title="Share Invite" variant="secondary" onPress={shareInvite} />
           </Card>
         ) : null}
-        <View style={styles.messages}>
+        <ScrollView
+          style={styles.messages}
+          contentContainerStyle={styles.messagesContent}
+          keyboardShouldPersistTaps="handled"
+        >
           {allMessages.length === 0 ? (
             <Text style={styles.empty}>No messages yet. Try: @AI what should I do next?</Text>
           ) : (
@@ -187,12 +191,16 @@ export default function ChatScreen() {
                   message.role === 'system' && styles.systemBubble,
                 ]}
               >
-                <Text style={styles.sender}>{message.senderName || message.role}</Text>
-                <Text style={styles.messageText}>{message.text}</Text>
+                <Text style={[styles.sender, message.role === 'user' && styles.userSender]}>
+                  {message.senderName || message.role}
+                </Text>
+                <Text style={[styles.messageText, message.role === 'user' && styles.userMessageText]}>
+                  {message.text}
+                </Text>
               </View>
             ))
           )}
-        </View>
+        </ScrollView>
         <View style={styles.inputRow}>
           <TextInput
             value={input}
@@ -242,7 +250,10 @@ const styles = StyleSheet.create({
   },
   messages: {
     flex: 1,
+  },
+  messagesContent: {
     gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   empty: {
     color: colors.muted,
@@ -277,6 +288,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     lineHeight: 21,
+  },
+  userSender: {
+    color: '#bfdbfe',
+  },
+  userMessageText: {
+    color: '#fff',
   },
   inputRow: {
     alignItems: 'flex-end',

@@ -64,6 +64,9 @@ export default function ReportScreen() {
   if (loading) return <Loading />;
 
   const r = report?.report_payload;
+  const visibleMissingItems = (r?.missing_items || []).filter(
+    (item) => !/witness|injury follow-up/i.test(item)
+  );
 
   return (
     <Screen>
@@ -134,10 +137,10 @@ export default function ReportScreen() {
             <Fact label="Repair Shop" value={r.repair_shop_name || 'Not provided'} />
           </Card>
 
-          {r.missing_items?.length ? (
+          {visibleMissingItems.length ? (
             <Card style={styles.card}>
               <Text style={styles.section}>Still Needed</Text>
-              {r.missing_items.map((item) => (
+              {visibleMissingItems.map((item) => (
                 <Text key={item} style={styles.muted}>- {item}</Text>
               ))}
             </Card>
