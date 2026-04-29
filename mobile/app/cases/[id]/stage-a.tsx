@@ -14,6 +14,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { CaseStepper } from '@/components/CaseStepper';
+import { DateTimeField } from '@/components/DateTimeField';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Field } from '@/components/Field';
 import { Loading } from '@/components/Loading';
@@ -253,7 +254,7 @@ export default function StageAScreen() {
       <Text style={styles.subtitle}>Fill in what you have now. You can update anytime.</Text>
       <Card style={styles.card}>
         <Text style={styles.section}>Accident Details</Text>
-        <Field label="Date & Time" value={form.occurred_at} onChangeText={(value) => set('occurred_at', value)} placeholder="2026-04-28T14:30" />
+        <DateTimeField label="Date & Time" value={form.occurred_at} onChange={(value) => set('occurred_at', value)} />
         <Field label="Location" value={form.address} onChangeText={(value) => set('address', value)} placeholder="123 Main St, Los Angeles, CA" />
         <Field label="Quick Summary" value={form.quick_summary} onChangeText={(value) => set('quick_summary', value)} placeholder="Rear-end collision at a red light..." multilineField />
       </Card>

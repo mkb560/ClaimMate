@@ -20,7 +20,8 @@
           "cameraPermission": "ClaimMate needs camera access so you can capture accident evidence."
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "apiBaseUrl": "https://claimmate-backend-production.up.railway.app",
