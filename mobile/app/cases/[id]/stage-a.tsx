@@ -22,6 +22,49 @@ import { colors, spacing } from '@/theme/theme';
 import { EMPTY_STAGE_A, StageAData } from '@/types/forms';
 import { dateTimeLocalToIso, textValue, toDateTimeLocal } from '@/utils/format';
 
+type PhotoCategory = 'owner_damage' | 'overview' | 'other_damage' | 'other';
+type PhotoSource = 'camera' | 'gallery';
+
+const PHOTO_CHANNELS: { category: PhotoCategory; title: string; hint: string }[] = [
+  {
+    category: 'owner_damage',
+    title: 'My Vehicle Damage',
+    hint: 'Close-ups of your vehicle damage.',
+  },
+  {
+    category: 'overview',
+    title: 'Scene / Overview',
+    hint: 'Road, lane, signal, and accident position.',
+  },
+  {
+    category: 'other_damage',
+    title: "Other Party's Vehicle",
+    hint: 'Photos of the other vehicle and visible damage.',
+  },
+  {
+    category: 'other',
+    title: 'Other',
+    hint: 'Receipts, extra angles, or anything else useful.',
+  },
+];
+
+const EMPTY_PHOTO_COUNTS: Record<PhotoCategory, number> = {
+  owner_damage: 0,
+  overview: 0,
+  other_damage: 0,
+  other: 0,
+};
+
+function countPhotosByCategory(photos: unknown[]): Record<PhotoCategory, number> {
+  return photos.reduce<Record<PhotoCategory, number>>((counts, item) => {
+    const category = (item as { category?: unknown })?.category;
+    if (category === 'owner_damage' || category === 'overview' || category === 'other_damage' || category === 'other') {
+      counts[category] += 1;
+    }
+    return counts;
+  }, { ...EMPTY_PHOTO_COUNTS });
+}
+
 function boolToTriState(value: unknown): TriState {
   if (value === true) return 'true';
   if (value === false) return 'false';
@@ -86,8 +129,8 @@ export default function StageAScreen() {
   const [form, setForm] = useState<StageAData>(EMPTY_STAGE_A);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [photoBusy, setPhotoBusy] = useState(false);
-  const [photoCount, setPhotoCount] = useState(0);
+  const [photoBusyKey, setPhotoBusyKey] = useState<string | null>(null);
+  const [photoCounts, setPhotoCounts] = useState<Record<PhotoCategory, number>>(EMPTY_PHOTO_COUNTS);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -106,7 +149,7 @@ export default function StageAScreen() {
         if (active) {
           setForm(buildInitial(snapshot.stage_a, policyStatus?.prefill, user));
           const photos = (snapshot.stage_a?.photo_attachments as unknown[]) || [];
-          setPhotoCount(photos.length);
+          setPhotoCounts(countPhotosByCategory(photos));
         }
       } catch {
         if (active) setForm(buildInitial(null, undefined, user));
@@ -168,8 +211,9 @@ export default function StageAScreen() {
     }
   }
 
-  async function uploadPhoto(source: 'camera' | 'gallery') {
-    setPhotoBusy(true);
+  async function uploadPhoto(source: PhotoSource, category: PhotoCategory) {
+    const busyKey = `${category}:${source}`;
+    setPhotoBusyKey(busyKey);
     setError('');
     try {
       if (source === 'camera') {
@@ -188,12 +232,12 @@ export default function StageAScreen() {
         uri: asset.uri,
         name: asset.fileName || `incident-${Date.now()}.jpg`,
         type: asset.mimeType || 'image/jpeg',
-      }, 'accident_scene');
-      setPhotoCount((count) => count + 1);
+      }, category);
+      setPhotoCounts((counts) => ({ ...counts, [category]: counts[category] + 1 }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Photo upload failed');
     } finally {
-      setPhotoBusy(false);
+      setPhotoBusyKey(null);
     }
   }
 
@@ -242,10 +286,36 @@ export default function StageAScreen() {
 
       <Card style={styles.card}>
         <Text style={styles.section}>Incident Photos</Text>
-        <Text style={styles.muted}>Photos uploaded: {photoCount}</Text>
-        <View style={styles.photoActions}>
-          <Button title="Take Photo" loading={photoBusy} onPress={() => uploadPhoto('camera')} />
-          <Button title="Choose From Gallery" variant="secondary" loading={photoBusy} onPress={() => uploadPhoto('gallery')} />
+        <Text style={styles.muted}>
+          Add photos by category so the report can separate vehicle damage from scene context.
+        </Text>
+        <View style={styles.photoGrid}>
+          {PHOTO_CHANNELS.map((channel) => (
+            <View key={channel.category} style={styles.photoChannel}>
+              <View style={styles.photoChannelHeader}>
+                <Text style={styles.photoTitle}>{channel.title}</Text>
+                <Text style={styles.photoCount}>{photoCounts[channel.category]}</Text>
+              </View>
+              <Text style={styles.photoHint}>{channel.hint}</Text>
+              <View style={styles.photoActions}>
+                <Button
+                  title="Camera"
+                  loading={photoBusyKey === `${channel.category}:camera`}
+                  disabled={photoBusyKey !== null}
+                  onPress={() => uploadPhoto('camera', channel.category)}
+                  style={styles.photoButton}
+                />
+                <Button
+                  title="Gallery"
+                  variant="secondary"
+                  loading={photoBusyKey === `${channel.category}:gallery`}
+                  disabled={photoBusyKey !== null}
+                  onPress={() => uploadPhoto('gallery', channel.category)}
+                  style={styles.photoButton}
+                />
+              </View>
+            </View>
+          ))}
         </View>
       </Card>
 
@@ -276,7 +346,48 @@ const styles = StyleSheet.create({
   muted: {
     color: colors.muted,
   },
-  photoActions: {
+  photoGrid: {
+    gap: spacing.md,
+  },
+  photoChannel: {
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.border,
+    borderRadius: 18,
+    borderWidth: 1,
     gap: spacing.sm,
+    padding: spacing.md,
+  },
+  photoChannelHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  photoTitle: {
+    color: colors.text,
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  photoCount: {
+    backgroundColor: '#dbeafe',
+    borderRadius: 999,
+    color: colors.blueDark,
+    fontWeight: '900',
+    minWidth: 30,
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    textAlign: 'center',
+  },
+  photoHint: {
+    color: colors.muted,
+    lineHeight: 20,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  photoButton: {
+    flex: 1,
   },
 });

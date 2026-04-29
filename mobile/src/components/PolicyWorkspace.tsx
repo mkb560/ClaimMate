@@ -32,7 +32,7 @@ export function PolicyWorkspace({
   const [answer, setAnswer] = useState('');
   const [citations, setCitations] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
@@ -57,7 +57,7 @@ export function PolicyWorkspace({
   }, [caseId, refresh]);
 
   async function chooseExisting(policy: DemoPolicy) {
-    setBusy(true);
+    setBusyAction(`policy:${policy.policy_key}`);
     setError('');
     try {
       await seedDemoPolicy(caseId, policy.policy_key);
@@ -65,7 +65,7 @@ export function PolicyWorkspace({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load existing policy');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -76,7 +76,7 @@ export function PolicyWorkspace({
     });
     if (picked.canceled || !picked.assets[0]) return;
     const asset = picked.assets[0];
-    setBusy(true);
+    setBusyAction('upload');
     setError('');
     try {
       await uploadPolicy(caseId, {
@@ -88,12 +88,12 @@ export function PolicyWorkspace({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function ask() {
-    setBusy(true);
+    setBusyAction('ask');
     setError('');
     setAnswer('');
     try {
@@ -103,7 +103,7 @@ export function PolicyWorkspace({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ask request failed');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -136,12 +136,13 @@ export function PolicyWorkspace({
                 key={policy.policy_key}
                 title={policy.label}
                 variant="secondary"
-                loading={busy}
+                loading={busyAction === `policy:${policy.policy_key}`}
+                disabled={busyAction !== null}
                 onPress={() => chooseExisting(policy)}
               />
             ))}
           </View>
-          <Button title="Upload Policy PDF" onPress={pickPolicyPdf} loading={busy} />
+          <Button title="Upload Policy PDF" onPress={pickPolicyPdf} loading={busyAction === 'upload'} disabled={busyAction !== null} />
         </Card>
       )}
 
@@ -155,7 +156,7 @@ export function PolicyWorkspace({
             placeholder="What is my liability coverage limit?"
             multilineField
           />
-          <Button title="Ask AI" onPress={ask} loading={busy} disabled={!question.trim()} />
+          <Button title="Ask AI" onPress={ask} loading={busyAction === 'ask'} disabled={!question.trim() || busyAction !== null} />
           {answer ? (
             <View style={styles.answerBox}>
               <Text style={styles.answer}>{answer}</Text>
