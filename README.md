@@ -206,8 +206,3 @@ If Railway is linked to the GitHub `main` branch, backend pushes to `main` can a
 - `docs/AI_CORE_PLAN_ZH.md`: AI core plan.
 - `docs/AUTH_AND_WEBSOCKET_KE.md`: auth, invites, and WebSocket notes.
 
-## Team Ownership
-
-- Mingtao Ding: AI core, RAG, dispute detection, deadline tracking, chat AI behavior.
-- Ke Wu: FastAPI product layer, auth, invites, WebSocket, deployment.
-- Yi-Hsien Lou: frontend UX, accident form, report UX, business/demo deliverables.
